@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: craflo-backend
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: backend
+    buildCommand: npm install --legacy-peer-deps
+    startCommand: node src/index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: LANGCHAIN_TRACING_V2
+        value: "true"
+      - key: LANGCHAIN_API_KEY
+        sync: false
+      - key: LANGCHAIN_PROJECT
+        value: "craflo-dev"
+      - key: LANGCHAIN_ENDPOINT
+        value: "https://api.smith.langchain.com"
+      - key: PORT
+        value: "10000"

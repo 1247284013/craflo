@@ -1,0 +1,9 @@
+{
+  "node_version": "20",
+  "dockerfile_lines": [],
+  "dependencies": ["."],
+  "graphs": {
+    "rag_agent": "./src/graphs/ragGraph.mjs:ragGraph"
+  },
+  "env": ".env"
+}

@@ -1,0 +1,86 @@
+{
+  "name": "designpath-ai",
+  "productName": "DesignPath AI",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AI-powered design engineering career growth platform",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron:dev": "node scripts/electron-dev.cjs",
+    "electron:build": "tsc && vite build && electron-builder",
+    "electron:build:win": "tsc && vite build && electron-builder --win",
+    "electron:build:mac": "tsc && vite build && electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.designpath.ai",
+    "productName": "DesignPath AI",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/icon.ico",
+      "installerHeaderIcon": "public/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "@xyflow/react": "^12.10.2",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.16.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.30.3",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.5.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^28.3.3",
+    "electron-builder": "^26.8.1",
+    "eslint": "^8.45.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.0.2",
+    "vite": "^4.4.5",
+    "wait-on": "^9.0.10"
+  }
+}

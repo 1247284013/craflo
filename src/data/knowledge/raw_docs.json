@@ -1,0 +1,60 @@
+[
+  {
+    "path": "C:\\Users\\zhang\\Desktop\\de master\\DATABASE\\形态学矩阵Morphological chart\\形态学矩阵（Morphological Chart）.docx",
+    "folder": "形态学矩阵Morphological chart",
+    "slug": "morphological-chart",
+    "texts": [
+      "形态学矩阵（Morphological Chart）",
+      "设计过程卡壳，往往不是由于灵感枯竭，而是缺少科学的发散工具。",
+      "通过形态学矩阵 (Morphological Chart)进行严谨的排列组合，不仅能高效推导出多个创新方案，更能深度展现你的系统性逻辑思维，证明你具备结构化拆解复杂问题的核心能力。",
+      "形态学矩阵将复杂问题拆解为多个独立的功能或形态特征变量(如结构，材质，交互方式)，对每一变量穷举可能的解决方案，最后跨越维度进行交叉组合，清晰呈现设计方案的推导逻辑与发散深度。",
+      "什么时候可以用形态学矩阵?",
+      "概念设计阶段(Ideation):",
+      "将矩阵中的每个子功能对应的不同的解决方案组合，可以发散不同的设计方案，进行快速迭代和验证想法。",
+      "形态学矩阵将复杂问题拆解为多个独立的功能或形态特征变量(如结构，材质，交互方式)，对每一变量穷举可能的解决方案，最后跨越维度进行交叉组合，清晰呈现设计方案的推导逻辑与发散深度。",
+      "参考链接；",
+      "https://arl.human.cornell.edu/PAGES_Delft/Morpholigical_Chart-deeper.pdf",
+      "https://www.slideserve.com/asis/p14415-system-design-review",
+      "http://www.joyce-liu.com/uxad/",
+      "https://me317.stanford.edu/twiki/pub/Main/ME317CourseContent/Slide27.jpg?utm_source=Pinterest&utm_medium=organic",
+      "https://doubledee4u.blogspot.com/2013/11/morphological-chart-and-concept.html"
+    ],
+    "images": [
+      "morphological-chart_image1.jpeg",
+      "morphological-chart_image2.jpeg",
+      "morphological-chart_image3.jpeg",
+      "morphological-chart_image4.jpeg"
+    ]
+  },
+  {
+    "path": "C:\\Users\\zhang\\Desktop\\de master\\DATABASE\\雷达图Radar chart\\雷达图Radar Chart .docx",
+    "folder": "雷达图Radar chart",
+    "slug": "radar-chart",
+    "texts": [
+      "雷达图Radar Chart",
+      "雷达图(radar chart)，又称蜘蛛网图(spider plot)，是一种表现多维数据的强弱的图表。它将多个维度的数据量映射到坐标轴上，这些坐标轴起始于同一个圆心点，通常结束于圆周边缘，将同一组的点使用线连接起来就称为了雷达图。",
+      "雷达图透过多维度量化评估多个设计方案或市场竞品。通过图形重叠面积的对比，直观论证设计的优越性与可行性。",
+      "1.什么时候可以用雷达图?",
+      "#01竞品分析(Competitor Analysis):",
+      "比较自己的设计与多个竞品在关键维度(如性能，可持续性)的优劣势。",
+      "#02用户调研(User Research):",
+      "分析特定用户画像在不同需求维度上的特征。",
+      "当然还有更多地方可以运用这一可视化工具，希望大家能进行灵活运用",
+      "2.雷达图设计步骤",
+      "雷达图step1-3",
+      "雷达图step4-5",
+      "3.可以参考的素材网址",
+      "https://www.pinterest.com/pin/512566001350790524/",
+      "https://www.pinterest.com/pin/78179743527397172/",
+      "https://www.pinterest.com/pin/267682771598393947/",
+      "AI 可引用场景：",
+      "用户问「怎么展示我的技能水平」→ 推荐雷达图",
+      "用户问「怎么在竞品分析中运用可视化工具」→ 推荐雷达图",
+      "作品集缺少能力可视化 → 建议加雷达图"
+    ],
+    "images": [
+      "radar-chart_image1.jpeg",
+      "radar-chart_image2.jpeg"
+    ]
+  }
+]
