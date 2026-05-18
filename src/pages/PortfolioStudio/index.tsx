@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css';
 import { FolderOpen, Grid3x3, Layers, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../store/useAppStore';
+import { generatePortfolioFromAI } from '../../lib/agentAPI';
 import { generatePortfolio } from '../../utils/mockAI';
 import type { TargetRole } from '../../types';
 import {
@@ -193,16 +194,27 @@ export default function PortfolioStudio() {
     navigator.clipboard.writeText(text);
   }, []);
 
-  const handleGenerate = useCallback(() => {
-    if (!selectedId || !targetRole) return;
+  const handleGenerate = useCallback(async () => {
+    if (!selectedId) return;
     const project = projects.find(p => p.id === selectedId);
     if (!project) return;
     setIsGenerating(true);
-    setTimeout(() => {
-      const portfolio = generatePortfolio(project, targetRole as TargetRole);
-      addPortfolio(portfolio);
+    try {
+      const role = (targetRole as string) ?? 'product-design-engineer';
+      const result = await generatePortfolioFromAI(
+        project as unknown as Record<string, unknown>,
+        role,
+      );
+      addPortfolio(result.portfolio as Parameters<typeof addPortfolio>[0]);
+    } catch {
+      // fallback to mock if backend unavailable
+      if (targetRole) {
+        const portfolio = generatePortfolio(project, targetRole as TargetRole);
+        addPortfolio(portfolio);
+      }
+    } finally {
       setIsGenerating(false);
-    }, 2500);
+    }
   }, [selectedId, targetRole, projects, addPortfolio]);
 
   const selectedProject = useMemo(() => projects.find(p => p.id === selectedId), [projects, selectedId]);

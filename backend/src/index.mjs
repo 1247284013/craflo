@@ -6,6 +6,7 @@ if (!globalThis.crypto) globalThis.crypto = webcrypto;
 import express from 'express';
 import cors from 'cors';
 import { ragGraph } from './graphs/ragGraph.mjs';
+import { portfolioGraph } from './graphs/portfolioGraph.mjs';
 import {
   suggestNodesChain,
   completeFieldChain,
@@ -122,6 +123,33 @@ app.post('/api/project/analyze', async (req, res) => {
     });
   } catch (err) {
     console.error('[/api/project/analyze]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Portfolio: Agent-to-Agent generation ─────────────────────────────────────
+// POST /api/portfolio/generate  { project: Project, targetRole: string }
+// Agent 1 (ProjectHandoffAgent) → Agent 2 (PortfolioStructureAgent)
+app.post('/api/portfolio/generate', async (req, res) => {
+  const { project, targetRole = 'product-design-engineer' } = req.body;
+  if (!project?.id) return res.status(400).json({ error: 'project is required' });
+
+  try {
+    const result = await portfolioGraph.invoke(
+      { project, targetRole },
+      { runName: `Portfolio A2A · ${project.name?.slice(0, 30)}` },
+    );
+
+    // portfolioResult is built by Agent 2 and includes Agent 1 analysis
+    const portfolio = result.portfolioResult;
+    if (!portfolio) throw new Error('Portfolio generation returned empty result');
+
+    res.json({
+      portfolio,
+      handoffAnalysis: result.handoffAnalysis, // expose Agent 1 output to frontend
+    });
+  } catch (err) {
+    console.error('[/api/portfolio/generate]', err.message);
     res.status(500).json({ error: err.message });
   }
 });

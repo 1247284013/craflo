@@ -82,6 +82,44 @@ export async function analyzeProject(context: string): Promise<ProjectAnalysis> 
   return post<ProjectAnalysis>('/api/project/analyze', { context });
 }
 
+// ── 6. Portfolio Studio: Agent-to-Agent generation ───────────────────────────
+export interface PortfolioPage {
+  pageNumber: number;
+  title: string;
+  contentSuggestion: string;
+  requiredMaterials: string[];
+  isComplete: boolean;
+}
+
+export interface HandoffAnalysis {
+  completionScore: number;
+  transferReady: boolean;
+  coreStrengths: string[];
+  narrativeArc: { problem: string; process: string; solution: string; outcome: string };
+  missingGaps: string[];
+  portfolioAngle: string;
+}
+
+export interface AIPortfolioResult {
+  portfolio: {
+    projectId: string;
+    targetRole: string;
+    highlights: string[];
+    overallSuggestion: string;
+    missingMaterials: string[];
+    structure: PortfolioPage[];
+    handoffAnalysis: HandoffAnalysis;
+  };
+  handoffAnalysis: HandoffAnalysis;
+}
+
+export async function generatePortfolioFromAI(
+  project: Record<string, unknown>,
+  targetRole: string,
+): Promise<AIPortfolioResult> {
+  return post<AIPortfolioResult>('/api/portfolio/generate', { project, targetRole });
+}
+
 // ── 5. Learning Path: AI adjust tasks ────────────────────────────────────────
 export async function adjustLearningPath<T>(tasks: T[], userInput: string): Promise<T[]> {
   const { tasks: adjusted } = await post<{ tasks: T[] }>('/api/learning/adjust', { tasks, userInput });

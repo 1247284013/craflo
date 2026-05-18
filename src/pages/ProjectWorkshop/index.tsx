@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { suggestProjectNodes } from '../../lib/agentAPI';
+import { useNavigate } from 'react-router-dom';
+import { suggestProjectNodes, generatePortfolioFromAI } from '../../lib/agentAPI';
 import {
   ReactFlow,
   Background,
@@ -14,7 +15,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus, FolderOpen, ZoomIn, Grid3x3 } from 'lucide-react';
+import { Plus, FolderOpen, ZoomIn, Grid3x3, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../store/useAppStore';
 import type { Project } from '../../types';
@@ -222,9 +223,146 @@ function createBlankProject(): Project {
   };
 }
 
+// ── A2A Handoff overlay ───────────────────────────────────────────────────────
+type HandoffStage = 'idle' | 'agent1' | 'agent2' | 'done' | 'error';
+
+interface HandoffState {
+  stage: HandoffStage;
+  agent1Result?: { completionScore: number; coreStrengths: string[]; portfolioAngle: string };
+  error?: string;
+}
+
+function HandoffOverlay({
+  state,
+  onClose,
+  onNavigate,
+}: {
+  state: HandoffState;
+  onClose: () => void;
+  onNavigate: () => void;
+}) {
+  const steps = [
+    { id: 'agent1', label: 'Agent 1 · 项目分析', desc: '评估完整度、提炼叙事弧线与核心亮点' },
+    { id: 'agent2', label: 'Agent 2 · 作品集生成', desc: '根据分析结果生成页面结构与内容建议' },
+  ];
+
+  const getStepStatus = (id: string) => {
+    if (state.stage === 'idle') return 'idle';
+    if (state.stage === 'error') return 'idle';
+    if (id === 'agent1') return state.stage === 'agent1' ? 'running' : 'done';
+    if (id === 'agent2') return state.stage === 'agent2' ? 'running' : state.stage === 'done' ? 'done' : 'idle';
+    return 'idle';
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.93, y: -16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.93 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+        style={{ background: '#ffffff', borderRadius: 24, padding: 36, width: 480, boxShadow: '0 24px 80px rgba(0,0,0,0.18)', border: '1px solid rgba(0,0,0,0.06)' }}
+      >
+        {/* Header */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 4 }}>
+            转入作品集工作台
+          </div>
+          <div style={{ fontSize: 13, color: '#9ca3af' }}>
+            双 Agent 协作 · 自动分析项目并生成作品集结构
+          </div>
+        </div>
+
+        {/* Steps */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+          {steps.map((step) => {
+            const status = getStepStatus(step.id);
+            return (
+              <div key={step.id} style={{
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '14px 16px', borderRadius: 14,
+                background: status === 'running' ? 'rgba(99,102,241,0.06)' : status === 'done' ? 'rgba(16,185,129,0.05)' : 'rgba(0,0,0,0.02)',
+                border: `1px solid ${status === 'running' ? 'rgba(99,102,241,0.25)' : status === 'done' ? 'rgba(16,185,129,0.20)' : 'rgba(0,0,0,0.06)'}`,
+                transition: 'all 0.3s ease',
+              }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  background: status === 'done' ? 'rgba(16,185,129,0.12)' : status === 'running' ? 'rgba(99,102,241,0.12)' : 'rgba(0,0,0,0.04)' }}>
+                  {status === 'done' ? (
+                    <CheckCircle2 size={16} style={{ color: '#10b981' }} />
+                  ) : status === 'running' ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+                      <Loader2 size={16} style={{ color: '#6366f1' }} />
+                    </motion.div>
+                  ) : (
+                    <div style={{ width: 8, height: 8, borderRadius: 4, background: 'rgba(0,0,0,0.15)' }} />
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: status === 'idle' ? '#9ca3af' : '#111827' }}>{step.label}</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{step.desc}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Agent 1 result preview */}
+        {state.agent1Result && state.stage !== 'agent1' && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 12, padding: '12px 14px', marginBottom: 20 }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#6366f1', marginBottom: 8 }}>
+              Agent 1 交接摘要 · 完整度 {state.agent1Result.completionScore}%
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {state.agent1Result.coreStrengths.slice(0, 3).map((s, i) => (
+                <span key={i} style={{ fontSize: 11, background: 'rgba(99,102,241,0.10)', color: '#4f46e5', padding: '2px 8px', borderRadius: 20 }}>{s}</span>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>{state.agent1Result.portfolioAngle}</div>
+          </motion.div>
+        )}
+
+        {/* Error */}
+        {state.stage === 'error' && (
+          <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.20)', borderRadius: 12, padding: '10px 14px', marginBottom: 20, fontSize: 12, color: '#ef4444' }}>
+            {state.error ?? '生成失败，请确认后端服务已启动'}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {state.stage !== 'agent1' && state.stage !== 'agent2' && (
+            <button
+              onClick={onClose}
+              style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(0,0,0,0.10)', borderRadius: 12, background: 'transparent', color: '#9ca3af', fontSize: 13, cursor: 'pointer' }}
+            >
+              {state.stage === 'done' ? '留在这里' : '取消'}
+            </button>
+          )}
+          {state.stage === 'done' && (
+            <button
+              onClick={onNavigate}
+              style={{ flex: 2, padding: '10px 0', border: 'none', borderRadius: 12, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              前往作品集工作台
+              <ArrowRight size={14} />
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ProjectWorkshop() {
-  const { projects, addProject, updateProject } = useAppStore();
+  const navigate = useNavigate();
+  const { projects, addProject, updateProject, addPortfolio, targetRole } = useAppStore();
 
   const [selectedId, setSelectedId] = useState<string | null>(
     projects.length > 0 ? projects[0].id : null
@@ -232,6 +370,7 @@ export default function ProjectWorkshop() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [handoff, setHandoff] = useState<HandoffState>({ stage: 'idle' });
 
   const selectedProject = useMemo(() => projects.find(p => p.id === selectedId), [projects, selectedId]);
   const confirmed = useMemo(() => selectedProject?.confirmedNodes ?? ['header'], [selectedProject]);
@@ -277,7 +416,52 @@ export default function ProjectWorkshop() {
     setSelectedId(p.id);
   }, [addProject]);
 
+  // Agent-to-Agent handoff: Project Workshop → Portfolio Studio
+  const handleHandoff = useCallback(async () => {
+    if (!selectedProject) return;
+    setHandoff({ stage: 'agent1' });
+    try {
+      const role = (targetRole as string) ?? 'product-design-engineer';
+      const result = await generatePortfolioFromAI(
+        selectedProject as unknown as Record<string, unknown>,
+        role,
+      );
+
+      // After Agent 1 analysis is visible, transition to Agent 2 phase
+      setHandoff({
+        stage: 'agent2',
+        agent1Result: result.handoffAnalysis
+          ? {
+              completionScore: result.handoffAnalysis.completionScore,
+              coreStrengths: result.handoffAnalysis.coreStrengths,
+              portfolioAngle: result.handoffAnalysis.portfolioAngle,
+            }
+          : undefined,
+      });
+
+      // Small delay to show Agent 2 running state before done
+      await new Promise(r => setTimeout(r, 600));
+
+      // Save portfolio to store
+      addPortfolio(result.portfolio as Parameters<typeof addPortfolio>[0]);
+
+      setHandoff(prev => ({ ...prev, stage: 'done' }));
+    } catch (err) {
+      setHandoff({ stage: 'error', error: (err as Error).message });
+    }
+  }, [selectedProject, targetRole, addPortfolio]);
+
   return (
+    <>
+    <AnimatePresence>
+      {handoff.stage !== 'idle' && (
+        <HandoffOverlay
+          state={handoff}
+          onClose={() => setHandoff({ stage: 'idle' })}
+          onNavigate={() => { setHandoff({ stage: 'idle' }); navigate('/portfolio'); }}
+        />
+      )}
+    </AnimatePresence>
     <div className="flex h-screen" style={{ height: 'calc(100vh - 0px)', background: '#f5f6fa' }}>
       {/* ── Left project panel ─────────────────────────────────────────── */}
       <div className="w-52 shrink-0 flex flex-col" style={{ background: '#ffffff', borderRight: '1px solid rgba(0,0,0,0.07)' }}>
@@ -329,6 +513,20 @@ export default function ProjectWorkshop() {
             </div>
           )}
         </div>
+
+        {/* ── Transfer to Portfolio button ─────────────────────────── */}
+        {selectedProject && (
+          <div className="p-3" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+            <button
+              onClick={handleHandoff}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all hover:opacity-85"
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.12))', color: '#6366f1', border: '1px solid rgba(99,102,241,0.30)' }}
+            >
+              <ArrowRight size={12} />
+              转入作品集
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Canvas ────────────────────────────────────────────────────── */}
@@ -402,5 +600,6 @@ export default function ProjectWorkshop() {
         )}
       </div>
     </div>
+    </>
   );
 }
