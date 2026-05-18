@@ -134,7 +134,7 @@ function buildNodes(
   // Materials always far left of layer 2
   if (confirmed.includes('materials') || suggested.includes('materials')) {
     const l2y = 220 + 2 * 240;
-    positions['materials'] = { x: positions[layer2Keys[0]]?.x - 380 ?? -60, y: l2y };
+    positions['materials'] = { x: (positions[layer2Keys[0]]?.x ?? 60) - 380, y: l2y };
   }
 
   // Analysis always at right of layer 2
