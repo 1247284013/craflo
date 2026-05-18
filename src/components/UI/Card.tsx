@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import { useSettingsStore } from '../../store/useSettingsStore';
 
 interface CardProps {
   children: ReactNode;
@@ -10,19 +9,19 @@ interface CardProps {
 }
 
 export function Card({ children, className = '', hover, onClick, style }: CardProps) {
-  const { appearance } = useSettingsStore();
-  const isDark = appearance === 'dark';
-
   return (
     <div
       onClick={onClick}
-      style={style}
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderColor: 'var(--border)',
+        boxShadow: 'var(--shadow-sm)',
+        color: 'var(--text-primary)',
+        transition: 'background-color 0.25s ease, border-color 0.25s ease',
+        ...style,
+      }}
       className={`
-        rounded-2xl shadow-sm border
-        ${isDark
-          ? 'bg-slate-800 border-slate-700 text-gray-100'
-          : 'bg-white border-gray-100 text-gray-900'
-        }
+        rounded-2xl border
         ${hover ? 'hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer' : ''}
         ${onClick ? 'cursor-pointer' : ''}
         ${className}

@@ -2,9 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+/* ── Global theme CSS variables ─────────────────────────────────── */
+:root {
+  --bg-page:         #f5f6fa;
+  --bg-surface:      #ffffff;
+  --bg-surface-2:    #f8fafc;
+  --bg-hover:        rgba(0,0,0,0.04);
+  --text-primary:    #111827;
+  --text-secondary:  #374151;
+  --text-muted:      #6b7280;
+  --text-faint:      #9ca3af;
+  --border:          rgba(0,0,0,0.07);
+  --border-strong:   rgba(0,0,0,0.12);
+  --shadow-sm:       0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md:       0 4px 12px rgba(0,0,0,0.10);
+
+  /* Accent (overridden by ThemeProvider JS) */
+  --accent-active:         #4F46E5;
+  --accent-active-hover:   #4338CA;
+  --accent-sidebar-bg:     #ffffff;
+  --accent-sidebar-border: rgba(0,0,0,0.07);
+  --accent-sidebar-hover:  rgba(99,102,241,0.08);
+  --accent-sidebar-text:   #374151;
+  --accent-sidebar-muted:  #9ca3af;
+  --accent-logo:           #6366f1;
+  --accent-hue:            239;
 }
+
+.dark {
+  --bg-page:         #0f172a;
+  --bg-surface:      #1e293b;
+  --bg-surface-2:    #162032;
+  --bg-hover:        rgba(255,255,255,0.05);
+  --text-primary:    #f1f5f9;
+  --text-secondary:  #cbd5e1;
+  --text-muted:      #94a3b8;
+  --text-faint:      #64748b;
+  --border:          rgba(255,255,255,0.08);
+  --border-strong:   rgba(255,255,255,0.14);
+  --shadow-sm:       0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md:       0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* ── Base resets ─────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
 
 html, body, #root {
   height: 100%;
@@ -14,24 +55,57 @@ html, body, #root {
 
 body {
   font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  background-color: #F0F4F8;
-  color: #1F2937;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
   display: block;
   place-items: unset;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ── Dark mode — global overrides for page content ──────────────── */
+/* Any element that sets an explicit white/light bg inline is hard to
+   override, so we patch the most common patterns here */
+
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  color: var(--text-primary);
+}
+.dark p, .dark span, .dark label, .dark li {
+  color: inherit;
+}
+
+/* Tailwind gray text overrides in dark mode */
+.dark .text-gray-900  { color: #f1f5f9 !important; }
+.dark .text-gray-800  { color: #e2e8f0 !important; }
+.dark .text-gray-700  { color: #cbd5e1 !important; }
+.dark .text-gray-600  { color: #94a3b8 !important; }
+.dark .text-gray-500  { color: #64748b !important; }
+.dark .text-gray-400  { color: #475569 !important; }
+
+/* Common background overrides */
+.dark .bg-white        { background-color: var(--bg-surface) !important; }
+.dark .bg-gray-50      { background-color: var(--bg-surface-2) !important; }
+.dark .bg-gray-100     { background-color: #1e293b !important; }
+
+/* Border overrides */
+.dark .border-gray-100 { border-color: var(--border) !important; }
+.dark .border-gray-200 { border-color: var(--border-strong) !important; }
+
+/* Input / textarea */
+.dark input, .dark textarea, .dark select {
+  background-color: var(--bg-surface-2);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+.dark input::placeholder, .dark textarea::placeholder {
+  color: var(--text-faint);
+}
+.dark input:focus, .dark textarea:focus {
+  border-color: var(--accent-active);
+  outline: none;
 }
 
 /* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #F1F5F9;
-}
-::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--bg-page); }
+::-webkit-scrollbar-thumb  { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
