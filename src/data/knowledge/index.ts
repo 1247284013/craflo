@@ -4,6 +4,7 @@
 // 本地 fallback 数据保留在 localFallback 中，Supabase 不可用时使用
 // ─────────────────────────────────────────────────────────────────────────────
 import { supabase } from '../../lib/supabase';
+import { ragQuery } from '../../lib/agentAPI';
 
 export type KnowledgeDomain = 'portfolio' | 'project' | 'learning-path' | 'interview' | 'general';
 export type KnowledgeLevel  = 'beginner' | 'intermediate' | 'advanced';
@@ -190,23 +191,44 @@ export interface AIAnswer {
 }
 
 export async function generateAnswer(query: string, lang: 'zh' | 'en' = 'zh'): Promise<AIAnswer> {
-  // Delegate to the LangChain Agent backend (LangSmith traces every step)
-  const res = await fetch('/api/rag', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, lang }),
-  });
-  if (!res.ok) throw new Error(`Agent backend error: ${res.status}`);
-  const data = await res.json() as {
-    text: string;
-    relatedNodes: KnowledgeNode[];
-    relatedPosts: CommunityPost[];
-    recommendations: string[];
-  };
+  // Delegate to the LangChain Agent backend. In production this must use
+  // VITE_API_BASE_URL via agentAPI; direct "/api/rag" only works in Vite dev proxy.
+  const data = await ragQuery(query, lang);
+
   return {
     text: data.text ?? '',
-    relatedNodes: data.relatedNodes ?? [],
-    relatedPosts: data.relatedPosts ?? [],
+    relatedNodes: (data.relatedNodes ?? []).map((n) => ({
+      id: n.id,
+      parent_id: null,
+      title_zh: n.title,
+      title_en: n.title,
+      type: (n.type as KnowledgeType) ?? 'concept',
+      content_zh: n.content ?? '',
+      content_en: n.content ?? '',
+      images: [],
+      domains: [],
+      roles: [],
+      level: (n.level as KnowledgeLevel) ?? 'beginner',
+      tags: n.tags ?? [],
+      sort_order: 0,
+    })),
+    relatedPosts: (data.relatedPosts ?? []).map((p) => ({
+      id: p.id,
+      title: p.title,
+      content: p.summary ?? '',
+      board_id: p.board,
+      author_name: null,
+      author_initial: null,
+      tags: [],
+      like_count: p.likes ?? 0,
+      comment_count: p.comments ?? 0,
+      view_count: p.views ?? 0,
+      is_solved: false,
+      is_official: false,
+      is_pinned: false,
+      has_ai_summary: Boolean(p.summary),
+      ai_summary: p.summary ?? null,
+    })),
     recommendations: data.recommendations ?? [],
   };
 }
