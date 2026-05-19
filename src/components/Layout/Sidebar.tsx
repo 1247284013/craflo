@@ -31,12 +31,18 @@ const NAV_ICONS = [
   { to: '/knowledge',    icon: Library,           key: 'knowledge' },
 ] as const;
 
-export function Sidebar() {
+interface SidebarProps {
+  forceCollapsed?: boolean;
+  onNavClick?: () => void;
+}
+
+export function Sidebar({ forceCollapsed, onNavClick }: SidebarProps) {
   const { onboardingComplete, targetRole, userProfile } = useAppStore();
   const { accentColor, sidebarMode, setSidebarMode } = useSettingsStore();
   const t = useT();
   const colors = ACCENT_COLORS[accentColor];
-  const collapsed = sidebarMode === 'collapsed';
+  // forceCollapsed = true on tablets (auto-icon mode)
+  const collapsed = forceCollapsed ?? sidebarMode === 'collapsed';
 
   return (
         <aside
@@ -94,6 +100,7 @@ export function Sidebar() {
             key={to}
             to={to}
             title={collapsed ? label : undefined}
+            onClick={onNavClick}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg text-sm font-medium transition-all group relative ${
                 collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'
@@ -132,6 +139,7 @@ export function Sidebar() {
         <NavLink
           to="/settings"
           title={collapsed ? t.nav.settings : undefined}
+          onClick={onNavClick}
           className={() =>
             `flex items-center gap-3 rounded-lg text-sm font-medium transition-all ${
               collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'
@@ -156,28 +164,30 @@ export function Sidebar() {
           {!collapsed && <span className="flex-1">{t.nav.settings}</span>}
         </NavLink>
 
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setSidebarMode(collapsed ? 'expanded' : 'collapsed')}
-          title={collapsed ? t.nav.expand : t.nav.collapse}
-          className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-all ${
-            collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'
-          }`}
-          style={{ color: colors.sidebarMuted }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.backgroundColor = colors.sidebarHover;
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-          }}
-        >
-          {collapsed ? <PanelLeftOpen size={17} /> : (
-            <>
-              <PanelLeftClose size={17} />
-              <span className="flex-1 text-left">{t.nav.collapse}</span>
-            </>
-          )}
-        </button>
+        {/* Collapse toggle — hidden when forceCollapsed (tablet auto-mode) */}
+        {!forceCollapsed && (
+          <button
+            onClick={() => setSidebarMode(collapsed ? 'expanded' : 'collapsed')}
+            title={collapsed ? t.nav.expand : t.nav.collapse}
+            className={`w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-all ${
+              collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'
+            }`}
+            style={{ color: colors.sidebarMuted }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = colors.sidebarHover;
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+            }}
+          >
+            {collapsed ? <PanelLeftOpen size={17} /> : (
+              <>
+                <PanelLeftClose size={17} />
+                <span className="flex-1 text-left">{t.nav.collapse}</span>
+              </>
+            )}
+          </button>
+        )}
 
         {!collapsed && (
           <div className="text-center pt-1 pb-0.5" style={{ color: colors.sidebarMuted, fontSize: '11px', opacity: 0.6 }}>

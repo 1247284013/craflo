@@ -16,7 +16,7 @@ const llm = new ChatGoogleGenerativeAI({
   model: 'gemini-2.5-flash',
   apiKey: process.env.GOOGLE_API_KEY,
   temperature: 0.3,
-  maxOutputTokens: 600,
+  maxOutputTokens: 1200,
 });
 
 // ── Available node descriptions (used in prompt) ──────────────────────────────
@@ -60,22 +60,52 @@ const completeLlm = new ChatGoogleGenerativeAI({
   model: 'gemini-2.5-flash',
   apiKey: process.env.GOOGLE_API_KEY,
   temperature: 0.65,
-  maxOutputTokens: 400,
+  maxOutputTokens: 1000,
 });
 
 export const completeFieldChain = RunnableSequence.from([
   PromptTemplate.fromTemplate(
-    `你是设计工程项目记录助手。根据以下已知的项目信息，为「{fieldLabel}」字段生成 100–200 字的专业描述。
+    `你是设计工程项目记录助手。根据以下已知的项目信息，为「{fieldLabel}」字段生成 300–500 字的专业描述。
 
 已知项目信息：
 {context}
 
 要求：
-- 直接输出描述内容，不要标题或解释
+- 内容充实完整，覆盖该字段应有的所有关键要素
 - 语言专业且简洁，符合工程报告风格
-- 不要编造项目中未提及的细节`,
+- 可以基于项目信息合理推断细节，但不要凭空捏造与项目无关的内容
+- 直接输出描述内容，不加标题、不加 markdown 格式`,
   ),
   completeLlm,
+  new StringOutputParser(),
+]);
+
+// ── Chain 3b: Research & generate project background from name only ───────────
+// Used when only the project name exists (first step in workshop)
+const researchLLM = new ChatGoogleGenerativeAI({
+  model: 'gemini-2.5-flash',
+  apiKey: process.env.GOOGLE_API_KEY,
+  temperature: 0.5,
+  maxOutputTokens: 700,
+});
+
+export const researchBackgroundChain = RunnableSequence.from([
+  PromptTemplate.fromTemplate(
+    `你是一位资深设计工程师，擅长撰写专业的项目背景调研报告。
+用户正在开发这个项目：「{projectName}」
+
+请根据项目名称，推断该产品/项目的类型，撰写一份完整的项目背景调研（500–700字）。
+
+内容结构（连续段落，不加标题）：
+1. **市场与行业背景**：该品类当前市场规模、增长趋势、主要玩家或典型产品，引用 1–2 个具体数据或报告
+2. **用户群体与使用场景**：目标用户画像（年龄/职业/使用频次）、核心使用场景与情境描述
+3. **现有产品痛点**：调研市面上同类产品存在的 3–4 个主要设计缺陷或用户抱怨点，可参考真实用户反馈
+4. **工程约束与技术背景**：该品类关键的工程约束（尺寸包络、重量限制、材料要求、IP 防护等级、相关认证标准如 GB/T、ISO、IEC 等）
+5. **本项目切入点**：基于以上调研，本项目拟解决的核心问题与差异化设计方向
+
+直接输出完整段落，不加 markdown 标记，不加编号标题，语言专业简洁，符合工业设计/产品工程文档风格。`
+  ),
+  researchLLM,
   new StringOutputParser(),
 ]);
 

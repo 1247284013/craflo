@@ -111,12 +111,32 @@ function getLLMText(response) {
 }
 
 function parseAnswer(rawText) {
-  const recoMatch = rawText.match(/<recommendations>([\s\S]*?)<\/recommendations>/);
   let recommendations = [];
+  let answer = rawText;
+
+  // Try <recommendations>...</recommendations> block (preferred format)
+  const recoMatch = rawText.match(/<recommendations>([\s\S]*?)<\/recommendations>/);
   if (recoMatch) {
-    try { recommendations = JSON.parse(recoMatch[1]); } catch { /* ignore */ }
+    const inner = recoMatch[1].replace(/```json|```/g, '').trim();
+    try { recommendations = JSON.parse(inner); } catch { /* ignore */ }
+    answer = rawText.replace(/<recommendations>[\s\S]*?<\/recommendations>/, '').trim();
   }
-  const answer = rawText.replace(/<recommendations>[\s\S]*?<\/recommendations>/, '').trim();
+
+  // Fallback: try to find a trailing JSON array in the text
+  if (recommendations.length === 0) {
+    const arrMatch = answer.match(/\[\s*"[^"]+?"[\s\S]*?\]\s*$/);
+    if (arrMatch) {
+      try {
+        recommendations = JSON.parse(arrMatch[0]);
+        answer = answer.slice(0, answer.lastIndexOf(arrMatch[0])).trim();
+      } catch { /* ignore */ }
+    }
+  }
+
+  // Ensure it's always an array of strings
+  if (!Array.isArray(recommendations)) recommendations = [];
+  recommendations = recommendations.filter((r) => typeof r === 'string' && r.trim()).slice(0, 4);
+
   return { answer, recommendations };
 }
 
@@ -178,17 +198,19 @@ async function rewriteQuery(state) {
   const res = await fastLLM.invoke([
     new SystemMessage(`你是一个 RAG 搜索系统的查询改写器，专注于设计工程、工业设计、用户研究、作品集领域。
 
+知识库中包含的工具/方法示例：雷达图、形态学矩阵、竞品分析、用户旅程图、思维导图、SWOT、亲和图等。
+
 改写目标：
 - 将口语/模糊/简短的查询转为专业、精准的检索语句
 - 补充领域上下文，消除歧义
 - 生成 2-3 个互补的搜索 query（覆盖不同角度）
-- 提取 3-5 个核心关键词用于关键词检索
+- 提取 4-6 个核心关键词：包括概念词、工具名、方法名（如果问题涉及可视化/图表，一定要推断并加入可能的工具名如"雷达图"）
 
 严格返回 JSON：
 {
   "rewrittenQuery": "改写后的主要检索语句（中文，15-40字）",
   "searchQueries": ["补充query1", "补充query2"],
-  "keywords": ["关键词1", "关键词2", "关键词3"]
+  "keywords": ["关键词1", "关键词2", "关键词3", "关键词4"]
 }`),
     new HumanMessage(
       `原始查询：${state.query}
@@ -227,12 +249,12 @@ async function hybridRetrieve(state) {
     // Vector search using primary rewritten query + secondary queries
     (async () => {
       const results = await Promise.all(
-        allQueries.slice(0, 2).map((q) => vectorSearchKnowledge(q, { threshold: 0.58, count: 5 })),
+        allQueries.slice(0, 2).map((q) => vectorSearchKnowledge(q, { threshold: 0.42, count: 6 })),
       );
       return dedup(results.flat());
     })(),
     // Vector search community posts
-    vectorSearchCommunity(state.rewrittenQuery, { threshold: 0.52, count: 4 }),
+    vectorSearchCommunity(state.rewrittenQuery, { threshold: 0.42, count: 4 }),
     // Keyword search knowledge nodes
     keywordSearchKnowledge(state.keywords),
     // Keyword search community posts
@@ -292,7 +314,7 @@ async function rerankResults(state) {
 // 文档相关性评估 + 上下文组装
 // ─────────────────────────────────────────────────────────────────────────────
 async function gradeDocs(state) {
-  const MIN_SCORE = 0.42;
+  const MIN_SCORE = 0.25;
 
   const qualityNodes = state.relatedNodes.filter((n) => (n._score ?? 0) >= MIN_SCORE);
   const qualityPosts = state.relatedPosts.filter((p) => (p._score ?? 0) >= MIN_SCORE);
@@ -333,11 +355,13 @@ async function generate(state) {
 检索结果（已按相关度排序）：
 ${state.context}
 
-要求：
+回答要求：
 - 综合知识库内容，给出有深度的实用回答
-- 可使用 Markdown 格式（标题、列表、代码块等）
+- 可使用 Markdown 格式（标题、列表）
 - 引用具体知识点时注明来源（知识库/社区）
-- 末尾附推荐问题：<recommendations>["问题1","问题2","问题3"]</recommendations>`,
+
+⚠️ 重要：回答正文结束后，必须紧接输出以下格式的推荐问题（3条，帮助用户深入探索，必须是完整的中文或英文问句）：
+<recommendations>["推荐问题1？", "推荐问题2？", "推荐问题3？"]</recommendations>`,
     ),
     new HumanMessage(state.rewrittenQuery || state.query),
   ]);
@@ -357,9 +381,11 @@ async function generateFallback(state) {
 知识库中未检索到足够相关的内容（用户原始问题：「${state.query}」，改写后：「${state.rewrittenQuery}」）。
 
 请基于你的专业知识用${lang}回答，并：
-- 开头简短说明"知识库暂无直接相关内容，以下为通用专业解答"
-- 提供实用、专业的内容
-- 末尾附推荐问题：<recommendations>["问题1","问题2","问题3"]</recommendations>`,
+- 开头一句说明"知识库暂无直接相关内容，以下为通用专业解答"
+- 提供实用、专业的内容，使用 Markdown 格式
+
+⚠️ 重要：回答正文结束后，必须紧接输出以下格式的推荐问题（3条，帮助用户深入探索，必须是完整的问句）：
+<recommendations>["推荐问题1？", "推荐问题2？", "推荐问题3？"]</recommendations>`,
     ),
     new HumanMessage(state.rewrittenQuery || state.query),
   ]);

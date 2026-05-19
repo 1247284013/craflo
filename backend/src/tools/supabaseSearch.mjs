@@ -22,7 +22,7 @@ export async function getEmbedding(text) {
 }
 
 // ── Vector search: knowledge nodes ────────────────────────────────────────────
-export async function vectorSearchKnowledge(query, { threshold = 0.60, count = 6 } = {}) {
+export async function vectorSearchKnowledge(query, { threshold = 0.42, count = 6 } = {}) {
   const embedding = await getEmbedding(query);
   const { data, error } = await supabase.rpc('match_knowledge_nodes', {
     query_embedding: embedding,
@@ -45,7 +45,7 @@ export async function vectorSearchKnowledge(query, { threshold = 0.60, count = 6
 }
 
 // ── Vector search: community posts ────────────────────────────────────────────
-export async function vectorSearchCommunity(query, { threshold = 0.55, count = 4 } = {}) {
+export async function vectorSearchCommunity(query, { threshold = 0.42, count = 4 } = {}) {
   const embedding = await getEmbedding(query);
   const { data, error } = await supabase.rpc('match_community_posts', {
     query_embedding: embedding,
@@ -85,7 +85,7 @@ export async function keywordSearchKnowledge(keywords) {
     type: n.type,
     tags: n.tags ?? [],
     level: n.level,
-    similarity: 0.5,   // keyword results get a moderate base score
+    similarity: 0.55,  // keyword results get a moderate base score
     source: 'keyword',
   }));
 }

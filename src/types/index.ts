@@ -163,6 +163,7 @@ export interface Project {
   structuredArchive?: ProjectArchive;
   confirmedNodes?: string[];
   suggestedNodes?: string[];   // AI-determined next-step node keys
+  extraFields?: Record<string, { label: string; content: string; parentKey: string }>;
 }
 
 export interface PortfolioPage {

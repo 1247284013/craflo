@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen, Send, ChevronRight, ChevronDown,
   X, ExternalLink, Bot, ImageIcon, Layers,
-  Loader2, Sparkles, ArrowRight, FileText,
+  Loader2, Sparkles, ArrowRight, FileText, PanelLeftOpen,
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 import {
   fetchAllNodes, getChildren, getNode, getBreadcrumb, generateAnswer,
   type KnowledgeNode, type AIAnswer, type CommunityPost,
@@ -122,7 +123,7 @@ function StarRating({ score, max = 5, color = T.accent }: { score: number; max?:
   return (
     <span style={{ display: 'inline-flex', gap: 2 }}>
       {Array.from({ length: max }).map((_, i) => (
-        <span key={i} style={{ fontSize: 10, color: i < filled ? color : T.textMuted, lineHeight: 1 }}>?</span>
+        <span key={i} style={{ fontSize: 10, color: i < filled ? color : T.textMuted, lineHeight: 1 }}>★</span>
       ))}
     </span>
   );
@@ -147,14 +148,14 @@ function calcReco(post: CommunityPost): number {
 }
 
 const BOARD_LABEL: Record<string, string> = {
-  'learning-path':    '????',
-  'project-help':     '????',
-  'portfolio-review': '?????',
-  'engineering-exp':  '????',
-  'jobs':             '????',
-  'tools-resources':  '????',
-  'ai-workflow':      'AI ???',
-  'announcements':    '??',
+  'learning-path':    '学习路径',
+  'project-help':     '项目求助',
+  'portfolio-review': '作品集点评',
+  'engineering-exp':  '工程经验',
+  'jobs':             '求职招聘',
+  'tools-resources':  '工具资源',
+  'ai-workflow':      'AI 工作流',
+  'announcements':    '公告',
 };
 
 // ?? Post card?in chat results?????????????????????????????????????????????????
@@ -182,8 +183,8 @@ function PostCard({ post, onClick }: { post: CommunityPost; onClick: () => void 
         <span style={{ fontSize: 10, fontWeight: 700, color: T.accent, background: T.accentDim, border: `1px solid ${T.accentBorder}`, borderRadius: 6, padding: '2px 8px' }}>
           {BOARD_LABEL[post.board_id] ?? post.board_id}
         </span>
-        {post.is_official && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>??</span>}
-        {post.is_solved   && <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>???</span>}
+        {post.is_official && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>官方</span>}
+        {post.is_solved   && <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>已解决</span>}
       </div>
 
       {/* Title */}
@@ -194,20 +195,20 @@ function PostCard({ post, onClick }: { post: CommunityPost; onClick: () => void 
       {/* AI summary if available */}
       {post.ai_summary && (
         <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.5, borderLeft: `2px solid ${T.accentBorder}`, paddingLeft: 8 }}>
-          {post.ai_summary.slice(0, 80)}??        </div>
+          {post.ai_summary.slice(0, 80)}…        </div>
       )}
 
       {/* Bottom: stats + stars */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: T.textMuted }}>
-          ?? {post.like_count} ? ?? {post.comment_count} ? ?? {post.view_count}
+          👍 {post.like_count} · 💬 {post.comment_count} · 👁 {post.view_count}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.textMuted }}>
-            ?? <StarRating score={heat} color="#f97316" />
+            热度 <StarRating score={heat} color="#f97316" />
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.textMuted }}>
-            ?? <StarRating score={reco} color={T.accent} />
+            推荐 <StarRating score={reco} color={T.accent} />
           </span>
         </div>
       </div>
@@ -226,9 +227,9 @@ function MarkdownText({ text }: { text: string }) {
         if (line.startsWith('### ')) return (
           <h4 key={i} style={{ fontSize: 13, fontWeight: 700, color: T.accent, margin: '10px 0 4px' }}>{line.slice(4)}</h4>
         );
-        if (line.startsWith('- ') || line.startsWith('? ')) return (
+        if (line.startsWith('- ') || line.startsWith('• ')) return (
           <div key={i} style={{ display: 'flex', gap: 8, margin: '2px 0' }}>
-            <span style={{ color: T.accent, flexShrink: 0, marginTop: 2 }}>?</span>
+            <span style={{ color: T.accent, flexShrink: 0, marginTop: 2 }}>•</span>
             <span style={{ fontSize: 14, color: T.textSec, lineHeight: 1.7 }}>{renderInline(line.slice(2))}</span>
           </div>
         );
@@ -290,7 +291,7 @@ function ChatMsg({ msg, isEn, onNodeClick, onSend, onPostClick }: {
         {/* Loading state */}
         {msg.loading && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.textMuted, fontSize: 13 }}>
-            <span>{isEn ? 'Reading knowledge base and thinking...' : '?????????????'}</span>
+            <span>{isEn ? 'Reading knowledge base and thinking...' : '正在查阅知识库并思考...'}</span>
           </div>
         )}
 
@@ -309,7 +310,7 @@ function ChatMsg({ msg, isEn, onNodeClick, onSend, onPostClick }: {
         {!msg.loading && msg.answer && msg.answer.relatedNodes.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
-              {isEn ? 'Related Knowledge' : '????'}
+              {isEn ? 'Related Knowledge' : '相关知识'}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {msg.answer.relatedNodes.map(n => (
@@ -323,7 +324,7 @@ function ChatMsg({ msg, isEn, onNodeClick, onSend, onPostClick }: {
         {!msg.loading && msg.answer && msg.answer.relatedPosts && msg.answer.relatedPosts.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
-              {isEn ? 'Community Discussions' : '??????'}
+              {isEn ? 'Community Discussions' : '社区讨论'}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {msg.answer.relatedPosts.map(p => (
@@ -335,9 +336,12 @@ function ChatMsg({ msg, isEn, onNodeClick, onSend, onPostClick }: {
 
         {/* Recommendations */}
         {!msg.loading && msg.answer && msg.answer.recommendations.length > 0 && (
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
-              {isEn ? 'You might also ask' : '??????'}
+          <div style={{ marginTop: 4, paddingTop: 14, borderTop: `1px solid ${T.divider}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <Sparkles size={12} color={T.accent} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.accent }}>
+                {isEn ? 'Continue exploring' : '继续探索'}
+              </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {msg.answer.recommendations.map((q, i) => (
@@ -359,23 +363,24 @@ function RecoChip({ text, onClick }: { text: string; onClick: () => void }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 8,
-        background: hovered ? T.surfaceHover : 'transparent',
+        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+        background: hovered ? T.accentDim : T.surface,
         border: `1px solid ${hovered ? T.accentBorder : T.border}`,
-        borderRadius: 8, padding: '7px 12px',
+        borderRadius: 10, padding: '9px 14px',
         cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
         fontSize: 13, color: hovered ? T.text : T.textSec,
       }}
     >
-      <ArrowRight size={11} color={T.accent} style={{ flexShrink: 0 }} />
-      {text}
+      <ArrowRight size={12} color={T.accent} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, lineHeight: 1.5 }}>{text}</span>
     </button>
   );
 }
 
 // ?? Node viewer drawer (right side) ???????????????????????????????????????????
-function NodeDrawer({ node, nodes, isEn, onClose }: {
+function NodeDrawer({ node, nodes, isEn, onClose, width = 480 }: {
   node: KnowledgeNode; nodes: KnowledgeNode[]; isEn: boolean; onClose: () => void;
+  width?: number | string;
 }) {
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const breadcrumb = getBreadcrumb(nodes, node.id);
@@ -383,7 +388,7 @@ function NodeDrawer({ node, nodes, isEn, onClose }: {
   const content = isEn && node.content_en ? node.content_en : node.content_zh;
 
   const LEVEL_COLOR: Record<string, string> = { beginner: '#10b981', intermediate: '#f59e0b', advanced: '#ef4444' };
-  const LEVEL_LABEL: Record<string, [string, string]> = { beginner: ['??', 'Beginner'], intermediate: ['??', 'Intermediate'], advanced: ['??', 'Advanced'] };
+  const LEVEL_LABEL: Record<string, [string, string]> = { beginner: ['入门', 'Beginner'], intermediate: ['进阶', 'Intermediate'], advanced: ['高级', 'Advanced'] };
   const levelColor = LEVEL_COLOR[node.level] ?? '#10b981';
   const levelLabel = (isEn ? LEVEL_LABEL[node.level]?.[1] : LEVEL_LABEL[node.level]?.[0]) ?? node.level;
 
@@ -395,7 +400,7 @@ function NodeDrawer({ node, nodes, isEn, onClose }: {
       transition={{ type: 'spring', damping: 28, stiffness: 300 }}
       style={{
         position: 'absolute', top: 0, right: 0, bottom: 0,
-        width: 480, background: T.surface,
+        width, background: T.surface,
         borderLeft: `1px solid ${T.border}`,
         display: 'flex', flexDirection: 'column',
         zIndex: 20, overflowY: 'auto',
@@ -441,7 +446,7 @@ function NodeDrawer({ node, nodes, isEn, onClose }: {
           <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <ImageIcon size={13} color={T.accent} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{isEn ? 'Reference Images' : '????'}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{isEn ? 'Reference Images' : '参考图片'}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: node.images.length === 1 ? '1fr' : 'repeat(2, 1fr)', gap: 10 }}>
               {node.images.map((img, i) => (
@@ -459,7 +464,7 @@ function NodeDrawer({ node, nodes, isEn, onClose }: {
           <div style={{ marginTop: 20, background: T.accentDim, border: `1px solid ${T.accentBorder}`, borderRadius: 12, padding: '14px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Bot size={13} color={T.accent} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: T.accent }}>{isEn ? 'AI Use Cases' : 'AI ?????'}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.accent }}>{isEn ? 'AI Use Cases' : 'AI 应用场景'}</span>
             </div>
             {node.ai_scenarios.map((s, i) => (
               <div key={i} style={{ fontSize: 13, color: T.textSec, lineHeight: 1.6, paddingLeft: 10, borderLeft: `2px solid ${T.accentBorder}`, marginBottom: 6 }}>{s}</div>
@@ -472,7 +477,7 @@ function NodeDrawer({ node, nodes, isEn, onClose }: {
           <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <ExternalLink size={13} color={T.textSec} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{isEn ? 'References' : '????'}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{isEn ? 'References' : '参考资料'}</span>
             </div>
             {node.references.map((ref, i) => (
               <a key={i} href={ref.url} target="_blank" rel="noopener noreferrer"
@@ -509,23 +514,23 @@ function NodeDrawer({ node, nodes, isEn, onClose }: {
 function WelcomeState({ isEn, onSuggest }: { isEn: boolean; onSuggest: (q: string) => void }) {
   const suggestions = isEn
     ? ['How to visualize skill levels?', 'How to use morphological matrix in concept design?', 'What tools can help with competitor analysis?']
-    : ['????????????', '????????????????', '?????????????'];
+    : ['如何可视化技能水平？', '形态学矩阵如何用于概念设计？', '哪些工具可以辅助竞品分析？'];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '40px 32px' }}>
       <div style={{ width: 60, height: 60, borderRadius: 18, background: T.accentDim, border: `1px solid ${T.accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
         <Layers size={26} color={T.accent} />
       </div>
       <div style={{ fontSize: 20, fontWeight: 700, color: T.text, marginBottom: 8 }}>
-        {isEn ? 'Design Engineering Knowledge Assistant' : '????????'}
+        {isEn ? 'Design Engineering Knowledge Assistant' : '设计工程知识助手'}
       </div>
       <div style={{ fontSize: 14, color: T.textSec, textAlign: 'center', maxWidth: 400, lineHeight: 1.7, marginBottom: 32 }}>
         {isEn
           ? 'Ask anything about design methods, tools, portfolio, or projects. I\'ll answer based on your knowledge base.'
-          : '????????????????????????????????????'}
+          : '关于设计方法、工具、作品集或项目，尽管问我。我会基于知识库为你解答。'}
       </div>
       <div style={{ width: '100%', maxWidth: 480 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
-          {isEn ? 'Try asking' : '????'}
+          {isEn ? 'Try asking' : '试试问'}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {suggestions.map((q, i) => (
@@ -555,6 +560,7 @@ export default function KnowledgeBasePage() {
   const { language } = useSettingsStore();
   const isEn = language === 'en-US';
   const navigate = useNavigate();
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   const [nodes, setNodes] = useState<KnowledgeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -562,6 +568,8 @@ export default function KnowledgeBasePage() {
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [drawerNodeId, setDrawerNodeId] = useState<string | null>(null);
+  // Mobile/tablet: knowledge tree shown as collapsible panel
+  const [treeOpen, setTreeOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -576,6 +584,14 @@ export default function KnowledgeBasePage() {
 
   const rootChildren = getChildren(nodes, 'root');
   const drawerNode = drawerNodeId ? getNode(nodes, drawerNodeId) : null;
+
+  // On small screens the drawer covers the full viewport
+  const drawerIsOverlay = !isDesktop;
+  // Drawer width adapts to screen
+  const drawerWidth = isMobile ? '100%' : isTablet ? 360 : 480;
+  // Message padding adapts
+  const msgPad = isMobile ? '16px 16px' : isTablet ? '20px 24px' : '28px 32px';
+  const inputPad = isMobile ? '12px 16px 16px' : '16px 28px 20px';
 
   const sendMessage = async (query: string) => {
     const q = query.trim();
@@ -599,7 +615,7 @@ export default function KnowledgeBasePage() {
     } catch (e) {
       setMessages(prev => prev.map(m =>
         m.id === aiMsgId
-          ? { ...m, content: isEn ? 'Failed to generate answer. Please try again.' : '???????????', loading: false, answer: { text: '', relatedNodes: [], relatedPosts: [], recommendations: [] } }
+          ? { ...m, content: isEn ? 'Failed to generate answer. Please try again.' : '生成答案失败，请稍后重试。', loading: false, answer: { text: '', relatedNodes: [], relatedPosts: [], recommendations: [] } }
           : m
       ));
     } finally {
@@ -618,35 +634,86 @@ export default function KnowledgeBasePage() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: T.bg, color: T.text }}>
 
       {/* Header */}
-      <div style={{ padding: '18px 28px', borderBottom: `1px solid ${T.border}`, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{
+        padding: isMobile ? '12px 16px' : '18px 28px',
+        borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
         <BookOpen size={18} color={T.accent} />
-        <h1 style={{ fontSize: 18, fontWeight: 700, color: T.text, margin: 0 }}>
-          {isEn ? 'Knowledge Base' : '???'}
+        <h1 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 700, color: T.text, margin: 0 }}>
+          {isEn ? 'Knowledge Base' : '知识库'}
         </h1>
         <span style={{ fontSize: 11, color: T.textMuted, background: T.surfaceHover, border: `1px solid ${T.border}`, borderRadius: 99, padding: '2px 9px' }}>
-          {isEn ? `${nodes.filter(n => n.type !== 'branch').length} entries` : `${nodes.filter(n => n.type !== 'branch').length} ???`}
+          {isEn ? `${nodes.filter(n => n.type !== 'branch').length} entries` : `${nodes.filter(n => n.type !== 'branch').length} 条目`}
         </span>
-        {loading && <Loader2 size={14} color={T.accent} style={{ animation: 'spin 1s linear infinite', marginLeft: 'auto' }} />}
+        {loading && <Loader2 size={14} color={T.accent} style={{ animation: 'spin 1s linear infinite' }} />}
+        {/* Tree toggle button on mobile/tablet */}
+        {!isDesktop && (
+          <button
+            onClick={() => setTreeOpen(o => !o)}
+            title={isEn ? 'Browse knowledge tree' : '浏览知识树'}
+            style={{
+              marginLeft: 'auto', background: treeOpen ? T.accentDim : 'none',
+              border: `1px solid ${treeOpen ? T.accentBorder : T.border}`,
+              borderRadius: 8, padding: '5px 10px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+              fontSize: 12, color: treeOpen ? T.accent : T.textSec,
+              flexShrink: 0,
+            }}
+          >
+            <PanelLeftOpen size={14} />
+            {!isMobile && (isEn ? 'Browse' : '浏览')}
+          </button>
+        )}
       </div>
+
+      {/* Mobile/tablet: collapsible knowledge tree panel (above chat) */}
+      <AnimatePresence>
+        {!isDesktop && treeOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{
+              overflow: 'hidden', flexShrink: 0,
+              borderBottom: `1px solid ${T.border}`,
+              background: T.surface,
+            }}
+          >
+            <div style={{ maxHeight: 220, overflowY: 'auto', padding: '8px 12px' }}>
+              {rootChildren.map(node => (
+                <TreeItem
+                  key={node.id} node={node} depth={0} nodes={nodes}
+                  selectedId={drawerNodeId}
+                  onSelect={id => { setDrawerNodeId(id); setTreeOpen(false); }}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Body */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', position: 'relative' }}>
 
-        {/* Left: Knowledge Tree */}
-        <div style={{ width: 220, flexShrink: 0, borderRight: `1px solid ${T.border}`, padding: '12px 8px', overflowY: 'auto' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: T.textMuted, letterSpacing: '0.08em', padding: '4px 8px 10px', textTransform: 'uppercase' }}>
-            {isEn ? 'Browse' : '?????'}
+        {/* Left: Knowledge Tree — desktop only */}
+        {isDesktop && (
+          <div style={{ width: 220, flexShrink: 0, borderRight: `1px solid ${T.border}`, padding: '12px 8px', overflowY: 'auto' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.textMuted, letterSpacing: '0.08em', padding: '4px 8px 10px', textTransform: 'uppercase' }}>
+              {isEn ? 'Browse' : '知识浏览'}
+            </div>
+            {rootChildren.map(node => (
+              <TreeItem key={node.id} node={node} depth={0} nodes={nodes} selectedId={drawerNodeId} onSelect={id => setDrawerNodeId(id)} />
+            ))}
           </div>
-          {rootChildren.map(node => (
-            <TreeItem key={node.id} node={node} depth={0} nodes={nodes} selectedId={drawerNodeId} onSelect={id => setDrawerNodeId(id)} />
-          ))}
-        </div>
+        )}
 
         {/* Center: Chat */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: msgPad }}>
             {messages.length === 0
               ? <WelcomeState isEn={isEn} onSuggest={q => { setInputValue(q); setTimeout(() => sendMessage(q), 50); }} />
               : messages.map(msg => (
@@ -662,7 +729,7 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Input */}
-          <div style={{ padding: '16px 28px 20px', borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
+          <div style={{ padding: inputPad, borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
             <div style={{
               display: 'flex', alignItems: 'flex-end', gap: 10,
               background: T.surfaceHover,
@@ -675,7 +742,7 @@ export default function KnowledgeBasePage() {
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isEn ? 'Ask anything about design knowledge... (Enter to send)' : '?????AI ????????????Enter ???'}
+                placeholder={isEn ? 'Ask anything about design knowledge...' : '输入问题，AI 将基于知识库为你解答（Enter 发送）'}
                 rows={1}
                 style={{
                   flex: 1, background: 'none', border: 'none', outline: 'none',
@@ -706,16 +773,35 @@ export default function KnowledgeBasePage() {
                 }
               </button>
             </div>
-            <div style={{ fontSize: 11, color: T.textMuted, marginTop: 8, textAlign: 'center' }}>
-              {isEn ? 'AI answers are generated based on the Craflo knowledge base' : 'AI ???? Craflo ???????'}
-            </div>
+            {!isMobile && (
+              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 8, textAlign: 'center' }}>
+                {isEn ? 'AI answers are generated based on the Craflo knowledge base' : 'AI 回答基于 Craflo 知识库内容生成'}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right: Node Drawer */}
+        {/* Right: Node Drawer — overlay on mobile/tablet, side panel on desktop */}
         <AnimatePresence>
           {drawerNode && drawerNode.type !== 'branch' && (
-            <NodeDrawer node={drawerNode} nodes={nodes} isEn={isEn} onClose={() => setDrawerNodeId(null)} />
+            <>
+              {/* Backdrop for overlay mode */}
+              {drawerIsOverlay && (
+                <motion.div
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  onClick={() => setDrawerNodeId(null)}
+                  style={{
+                    position: 'absolute', inset: 0, zIndex: 19,
+                    background: 'rgba(0,0,0,0.25)',
+                  }}
+                />
+              )}
+              <NodeDrawer
+                node={drawerNode} nodes={nodes} isEn={isEn}
+                onClose={() => setDrawerNodeId(null)}
+                width={drawerWidth}
+              />
+            </>
           )}
         </AnimatePresence>
       </div>

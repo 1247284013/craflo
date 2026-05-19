@@ -11,6 +11,7 @@ import {
   suggestNodesChain,
   completeFieldChain,
   analyzeProjectChain,
+  researchBackgroundChain,
 } from './chains/projectChain.mjs';
 import { adjustLearningPathChain } from './chains/learningChain.mjs';
 
@@ -83,6 +84,23 @@ app.post('/api/project/suggest-nodes', async (req, res) => {
   } catch (err) {
     console.error('[/api/project/suggest-nodes]', err.message);
     res.json({ keys: ['designGoal', 'challenge', 'contribution'] });
+  }
+});
+
+// ── Project: research background from project name only ──────────────────────
+// POST /api/project/research-background  { projectName: string }
+app.post('/api/project/research-background', async (req, res) => {
+  const { projectName = '' } = req.body;
+  if (!projectName.trim()) return res.status(400).json({ error: 'projectName is required' });
+  try {
+    const text = await researchBackgroundChain.invoke(
+      { projectName },
+      { runName: `ResearchBackground · ${projectName.slice(0, 30)}` },
+    );
+    res.json({ text: text.trim() });
+  } catch (err) {
+    console.error('[/api/project/research-background]', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

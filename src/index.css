@@ -109,3 +109,47 @@ body {
 ::-webkit-scrollbar-track  { background: var(--bg-page); }
 ::-webkit-scrollbar-thumb  { background: var(--border-strong); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+/* ── Responsive helpers ──────────────────────────────────────────── */
+
+/* Hide scrollbar for horizontal tabs on mobile */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Smooth transitions for layout changes */
+.layout-transition {
+  transition: width 0.25s ease, transform 0.25s ease, opacity 0.2s ease;
+}
+
+/* ── Media query overrides ───────────────────────────────────────── */
+
+/* Tablet: 640px – 1023px */
+@media (max-width: 1023px) {
+  /* Tighten up page padding */
+  .page-header { padding: 14px 20px !important; }
+
+  /* ReactFlow canvas: keep full-height on tablets */
+  .react-flow { min-height: 400px; }
+}
+
+/* Mobile: < 640px */
+@media (max-width: 639px) {
+  /* Full-width modals on mobile */
+  .modal-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+  }
+
+  /* Tighter typography */
+  h1 { font-size: 18px !important; }
+  h2 { font-size: 16px !important; }
+
+  /* Node cards in ReactFlow: don't overflow viewport */
+  .react-flow__node { max-width: calc(100vw - 32px); }
+
+  /* Stack WelcomeState suggestions vertically with tighter gap */
+  .welcome-suggestions { gap: 8px !important; }
+}

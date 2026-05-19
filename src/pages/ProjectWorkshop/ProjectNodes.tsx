@@ -1,13 +1,14 @@
 import { memo, useCallback, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   BookOpen, Target, User, Zap, GitCompare, Package,
   Settings2, Lightbulb, Layers, ImagePlus, Sparkles,
-  X, Upload, CheckCircle, Bot, CheckCircle2, Loader2,
+  X, Upload, CheckCircle, Bot, CheckCircle2, Loader2, Expand, Plus,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Project, ProjectMaterial } from '../../types';
-import { completeProjectField, analyzeProject } from '../../lib/agentAPI';
+import { completeProjectField, analyzeProject, researchProjectBackground } from '../../lib/agentAPI';
 
 function buildProjectContext(project: Project): string {
   return [
@@ -40,6 +41,103 @@ const T = {
 const ICON_MAP: Record<string, React.ElementType> = {
   BookOpen, Target, User, Zap, GitCompare, Package, Settings2, Lightbulb, Layers, Sparkles, Loader2,
 };
+
+// ── Full-screen field editor (portal) ────────────────────────────────────────
+function FieldEditor({
+  label,
+  icon: Icon,
+  value,
+  placeholder,
+  onClose,
+  onChange,
+  onAISuggest,
+  aiLoading,
+  isBackground,
+}: {
+  label: string;
+  icon: React.ElementType;
+  value: string;
+  placeholder: string;
+  onClose: () => void;
+  onChange: (v: string) => void;
+  onAISuggest: () => void;
+  aiLoading: boolean;
+  isBackground: boolean;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const wordCount = value.trim() ? value.trim().length : 0;
+
+  return createPortal(
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ width: '680px', maxWidth: '92vw', maxHeight: '82vh', background: '#ffffff', borderRadius: 20, boxShadow: '0 32px 80px rgba(0,0,0,0.22)', border: '1px solid rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 10, background: '#f8f9fb' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(99,102,241,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon size={14} style={{ color: T.accent }} />
+          </div>
+          <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: T.textPrimary }}>{label}</span>
+          <button
+            onClick={onAISuggest}
+            disabled={aiLoading}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 9, background: aiLoading ? T.accentDim : 'rgba(99,102,241,0.08)', border: `1px solid ${T.accentBorder}`, color: T.accent, fontSize: 12, fontWeight: 500, cursor: aiLoading ? 'not-allowed' : 'pointer' }}
+          >
+            {aiLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={12} />}
+            {aiLoading ? 'AI 生成中…' : isBackground && !value.trim() ? 'AI 调研背景' : 'AI 补全'}
+          </button>
+          <button
+            onClick={onClose}
+            style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'rgba(0,0,0,0.06)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <X size={14} style={{ color: T.textMuted }} />
+          </button>
+        </div>
+
+        {/* Editor body */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            style={{
+              flex: 1, width: '100%', padding: '20px 24px',
+              fontSize: 13.5, lineHeight: 1.8, color: T.textPrimary,
+              background: 'transparent', border: 'none', outline: 'none',
+              resize: 'none', fontFamily: 'inherit', caretColor: T.accent,
+              minHeight: '320px',
+            }}
+          />
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafafa' }}>
+          <span style={{ fontSize: 11, color: T.textMuted }}>{wordCount} 字 &nbsp;·&nbsp; Esc 关闭</span>
+          <button
+            onClick={onClose}
+            style={{ padding: '6px 18px', borderRadius: 9, background: T.accent, border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
+            完成
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 const handleStyle = {
   width: 8, height: 8,
@@ -117,105 +215,284 @@ ProjectHeaderNode.displayName = 'ProjectHeaderNode';
 // ── Field Node ────────────────────────────────────────────────────────────────
 export type FieldNodeData = {
   projectId: string;
-  fieldKey: keyof Project;
+  fieldKey: keyof Project | '__extra__';
+  customId?: string;          // only when fieldKey === '__extra__'
   label: string;
   placeholder: string;
   category: string;
   iconName: string;
+  onAddAfter?: (parentKey: string, label: string) => void;
+  nodeKey: string;            // the canvas key for this node (e.g. 'background', 'extra:abc')
 };
+
+// ── Add-child popover ─────────────────────────────────────────────────────────
+function AddChildPopover({
+  onConfirm,
+  onClose,
+}: {
+  onConfirm: (label: string) => void;
+  onClose: () => void;
+}) {
+  const [val, setVal] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  const confirm = () => { if (val.trim()) { onConfirm(val.trim()); onClose(); } };
+
+  return (
+    <div
+      className="nodrag nopan"
+      onClick={e => e.stopPropagation()}
+      style={{
+        position: 'absolute', top: 'calc(100% + 10px)', left: '50%',
+        transform: 'translateX(-50%)', zIndex: 200,
+        width: 220, background: '#fff',
+        border: `1px solid ${T.accentBorder}`,
+        borderRadius: 14, boxShadow: '0 8px 32px rgba(99,102,241,0.18)',
+        padding: '12px 12px 10px',
+      }}
+    >
+      <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, fontWeight: 500 }}>
+        给新卡片起个名字
+      </div>
+      <input
+        ref={inputRef}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') confirm(); if (e.key === 'Escape') onClose(); }}
+        placeholder="例：用户洞察、成本分析…"
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '7px 10px', borderRadius: 9, fontSize: 12,
+          border: `1px solid ${T.accentBorder}`, outline: 'none',
+          color: T.textPrimary, background: '#f8f9fb', fontFamily: 'inherit',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <button
+          onClick={onClose}
+          style={{ flex: 1, padding: '6px 0', border: `1px solid ${T.nodeBorder}`, borderRadius: 8, background: 'transparent', color: T.textMuted, fontSize: 11, cursor: 'pointer' }}
+        >
+          取消
+        </button>
+        <button
+          onClick={confirm}
+          disabled={!val.trim()}
+          style={{ flex: 2, padding: '6px 0', border: 'none', borderRadius: 8, background: val.trim() ? T.accent : T.accentDim, color: val.trim() ? '#fff' : T.textMuted, fontSize: 11, fontWeight: 600, cursor: val.trim() ? 'pointer' : 'not-allowed' }}
+        >
+          添加
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export const FieldNode = memo(({ data, selected }: NodeProps) => {
   const { projects, updateProject } = useAppStore();
   const d = data as FieldNodeData;
   const project = projects.find(p => p.id === d.projectId);
-  const value = project ? ((project[d.fieldKey] as string) || '') : '';
+
+  // Read value: either from a top-level Project field or from extraFields
+  const value = project
+    ? d.fieldKey === '__extra__' && d.customId
+      ? (project.extraFields?.[d.customId]?.content ?? '')
+      : ((project[d.fieldKey as keyof Project] as string) || '')
+    : '';
+
   const Icon = ICON_MAP[d.iconName] || BookOpen;
   const filled = value.trim().length > 0;
   const [aiLoading, setAiLoading] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (project) updateProject(project.id, { [d.fieldKey]: e.target.value });
-  }, [project, d.fieldKey, updateProject]);
+  // Press E while hovering → open editor
+  useEffect(() => {
+    if (!hovered || showAdd) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'e' || e.key === 'E') { e.preventDefault(); setExpanded(true); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [hovered, showAdd]);
 
-  const handleAISuggest = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Write value back to store
+  const handleChange = useCallback((v: string) => {
+    if (!project) return;
+    if (d.fieldKey === '__extra__' && d.customId) {
+      const prev = project.extraFields ?? {};
+      updateProject(project.id, {
+        extraFields: { ...prev, [d.customId]: { ...prev[d.customId], content: v } },
+      } as Partial<typeof project>);
+    } else {
+      updateProject(project.id, { [d.fieldKey as keyof Project]: v });
+    }
+  }, [project, d.fieldKey, d.customId, updateProject]);
+
+  const runAISuggest = useCallback(async () => {
     if (!project || aiLoading) return;
     setAiLoading(true);
     try {
+      let suggestion: string;
       const ctx = buildProjectContext(project);
-      const suggestion = await completeProjectField(ctx || '（项目其他字段暂未填写）', d.label);
-      updateProject(project.id, { [d.fieldKey]: suggestion.trim() });
-    } catch {
-      // silent fail
-    } finally {
-      setAiLoading(false);
-    }
-  }, [project, d.label, d.fieldKey, updateProject, aiLoading]);
+      if (d.fieldKey === 'background' && !ctx.trim() && project.name?.trim()) {
+        suggestion = await researchProjectBackground(project.name.trim());
+      } else {
+        suggestion = await completeProjectField(
+          ctx || `项目名称：${project.name}`,
+          d.label,
+        );
+      }
+      handleChange(suggestion.trim());
+    } catch { /* silent */ }
+    finally { setAiLoading(false); }
+  }, [project, d.label, d.fieldKey, handleChange, aiLoading]);
+
+  const handleAISuggest = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation(); runAISuggest();
+  }, [runAISuggest]);
+
+  const preview = value.length > 90 ? value.slice(0, 90) + '…' : value;
+  const isBackground = d.fieldKey === 'background';
 
   return (
-    <div
-      className={nodeBase(selected)}
-      style={{
-        width: 252,
-        background: T.nodeBg,
-        border: `1px solid ${selected ? T.accentBorder : T.nodeBorder}`,
-        boxShadow: selected ? `0 0 0 1px rgba(99,102,241,0.25), 0 4px 20px rgba(0,0,0,0.10)` : '0 1px 8px rgba(0,0,0,0.07)',
-      }}
-    >
-      <Handle type="target" position={Position.Top} style={handleStyle} />
-      <Handle type="source" position={Position.Bottom} style={handleStyle} />
-
+    <>
+      {/* Outer: position: relative, overflow: visible so + button can float below */}
       <div
-        style={{ background: T.headerBg, borderBottom: `1px solid ${T.divider}` }}
-        className="px-3 py-2.5 flex items-center gap-2"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => { setHovered(false); }}
+        style={{ position: 'relative', width: 252 }}
       >
-        <Icon size={12} style={{ color: filled ? T.accent : T.textMuted }} />
-        <span className="text-xs font-medium truncate flex-1" style={{ color: T.textSecond }}>
-          {d.label}
-        </span>
-        {filled && <CheckCircle size={11} style={{ color: T.accent }} />}
+        {/* Visual card (keeps overflow-hidden for border-radius clipping) */}
+        <div
+          style={{
+            borderRadius: 16, overflow: 'hidden',
+            background: T.nodeBg,
+            border: `1px solid ${selected ? T.accentBorder : hovered ? 'rgba(99,102,241,0.22)' : T.nodeBorder}`,
+            boxShadow: selected
+              ? `0 0 0 1px rgba(99,102,241,0.25), 0 4px 20px rgba(0,0,0,0.10)`
+              : hovered ? '0 4px 16px rgba(99,102,241,0.10)' : '0 1px 8px rgba(0,0,0,0.07)',
+            transition: 'border-color 0.15s, box-shadow 0.15s',
+          }}
+        >
+          <Handle type="target" position={Position.Top} style={handleStyle} />
+          <Handle type="source" position={Position.Bottom} style={handleStyle} />
+
+          {/* Hover tooltip: press E */}
+          {hovered && !expanded && !showAdd && (
+            <div style={{
+              position: 'absolute', top: -28, left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(17,24,39,0.85)', color: '#fff', borderRadius: 7,
+              padding: '3px 9px', fontSize: 11, whiteSpace: 'nowrap', pointerEvents: 'none',
+              backdropFilter: 'blur(4px)', zIndex: 10,
+            }}>
+              按 <kbd style={{ background: 'rgba(255,255,255,0.18)', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace' }}>E</kbd> 展开编辑
+            </div>
+          )}
+
+          {/* Header */}
+          <div style={{ background: T.headerBg, borderBottom: `1px solid ${T.divider}` }} className="px-3 py-2.5 flex items-center gap-2">
+            <Icon size={12} style={{ color: filled ? T.accent : T.textMuted }} />
+            <span className="text-xs font-medium truncate flex-1" style={{ color: T.textSecond }}>{d.label}</span>
+            {filled && <CheckCircle size={11} style={{ color: T.accent }} />}
+            {hovered && (
+              <button className="nodrag" onClick={e => { e.stopPropagation(); setExpanded(true); }} title="展开编辑 (E)"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, background: 'rgba(99,102,241,0.10)', border: 'none', cursor: 'pointer' }}>
+                <Expand size={10} style={{ color: T.accent }} />
+              </button>
+            )}
+          </div>
+
+          {/* Preview body */}
+          <div className="p-3">
+            {filled ? (
+              <p className="text-xs leading-relaxed cursor-text"
+                style={{ color: T.textSecond, lineHeight: '1.65', wordBreak: 'break-all' }}
+                onClick={e => { e.stopPropagation(); setExpanded(true); }}>
+                {preview}
+                {value.length > 90 && (
+                  <span style={{ color: T.accent, marginLeft: 4 }} onClick={e => { e.stopPropagation(); setExpanded(true); }}>展开</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs" style={{ color: T.textMuted, lineHeight: '1.6' }}>{d.placeholder}</p>
+            )}
+            <div className="mt-3 flex items-center justify-between">
+              <button className="nodrag flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all hover:opacity-80"
+                style={{ background: aiLoading ? T.accentDim : 'rgba(99,102,241,0.08)', color: T.accent, border: `1px solid ${T.accentBorder}`, cursor: aiLoading ? 'not-allowed' : 'pointer' }}
+                onClick={handleAISuggest} disabled={aiLoading}>
+                {aiLoading ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={10} />}
+                {aiLoading ? 'AI 生成中…' : isBackground && !value.trim() ? 'AI 调研背景' : 'AI 补全'}
+              </button>
+              {value.length > 0 && <span className="text-xs" style={{ color: T.textMuted }}>{value.length} 字</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* ── + button: float below card ──────────────────────────────── */}
+        {hovered && (
+          <div style={{ position: 'absolute', bottom: -14, left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}>
+            <button
+              className="nodrag"
+              onClick={e => { e.stopPropagation(); setShowAdd(v => !v); }}
+              title="从这里添加新卡片"
+              style={{
+                width: 24, height: 24, borderRadius: '50%',
+                background: showAdd ? T.accent : '#fff',
+                border: `1.5px solid ${T.accentBorder}`,
+                boxShadow: '0 2px 8px rgba(99,102,241,0.18)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              <Plus size={12} style={{ color: showAdd ? '#fff' : T.accent }} />
+            </button>
+            {/* tooltip */}
+            {!showAdd && (
+              <div style={{
+                position: 'absolute', top: 28, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(17,24,39,0.82)', color: '#fff', borderRadius: 6,
+                padding: '2px 8px', fontSize: 10, whiteSpace: 'nowrap', pointerEvents: 'none',
+              }}>
+                添加关联卡片
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Add-child popover */}
+        {showAdd && (
+          <AddChildPopover
+            onConfirm={(label) => {
+              d.onAddAfter?.(d.nodeKey, label);
+              setShowAdd(false);
+            }}
+            onClose={() => setShowAdd(false)}
+          />
+        )}
       </div>
 
-      <div className="p-3">
-        <textarea
-          className="nodrag nopan w-full text-xs outline-none resize-none leading-relaxed"
-          style={{
-            background: 'transparent',
-            color: T.textPrimary,
-            border: 'none',
-            caretColor: T.accent,
-            lineHeight: '1.6',
-          }}
-          rows={4}
+      {/* Full-screen editor portal */}
+      {expanded && project && (
+        <FieldEditor
+          label={d.label}
+          icon={Icon}
           value={value}
-          onChange={handleChange}
           placeholder={d.placeholder}
-          onClick={e => e.stopPropagation()}
+          onClose={() => setExpanded(false)}
+          onChange={handleChange}
+          onAISuggest={runAISuggest}
+          aiLoading={aiLoading}
+          isBackground={isBackground}
         />
-        <div className="mt-2 flex items-center justify-between">
-          <button
-            className="nodrag flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all hover:opacity-80"
-            style={{
-              background: aiLoading ? T.accentDim : 'rgba(99,102,241,0.08)',
-              color: T.accent,
-              border: `1px solid ${T.accentBorder}`,
-              cursor: aiLoading ? 'not-allowed' : 'pointer',
-            }}
-            onClick={handleAISuggest}
-            disabled={aiLoading}
-          >
-            {aiLoading
-              ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />
-              : <Sparkles size={10} />
-            }
-            {aiLoading ? 'AI 生成中…' : 'AI 补全'}
-          </button>
-          {value.length > 0 && (
-            <span className="text-xs" style={{ color: T.textMuted }}>{value.length}</span>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 });
 FieldNode.displayName = 'FieldNode';

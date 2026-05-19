@@ -75,12 +75,15 @@ function layerPositions(keys: string[], layer: number): Record<string, { x: numb
 }
 
 // ── Build edges from confirmed + suggested keys ───────────────────────────────
-function buildEdges(pid: string, confirmed: string[], suggested: string[]): Edge[] {
+function buildEdges(
+  pid: string,
+  confirmed: string[],
+  suggested: string[],
+  extraFields: Project['extraFields'],
+): Edge[] {
   const edges: Edge[] = [];
-  const add = (source: string, target: string) => {
-    const solid = confirmed.includes(source) && confirmed.includes(target);
-    const visible = confirmed.includes(source) || confirmed.includes(target);
-    if (!visible) return;
+  const add = (source: string, target: string, dashed = false) => {
+    const solid = !dashed && confirmed.includes(source) && confirmed.includes(target);
     edges.push({
       id: `${pid}-${source}-${target}`,
       source: `${pid}-${source}`,
@@ -95,16 +98,19 @@ function buildEdges(pid: string, confirmed: string[], suggested: string[]): Edge
     });
   };
 
-  // header → overview
   add('header', 'background');
-  // overview → each suggested
-  const allNext = [...new Set([...suggested, ...confirmed.filter(k => k !== 'header' && k !== 'background')])];
+  const allNext = [...new Set([...suggested, ...confirmed.filter(k => k !== 'header' && k !== 'background' && !k.startsWith('extra:'))])];
   allNext.forEach(k => add('background', k));
-  // analysis always links from last confirmed content nodes
-  const contentConfirmed = confirmed.filter(k => !['header', 'background', 'materials', 'analysis'].includes(k));
+  const contentConfirmed = confirmed.filter(k => !['header', 'background', 'materials', 'analysis'].includes(k) && !k.startsWith('extra:'));
   if (contentConfirmed.length > 0 || suggested.includes('analysis')) {
     contentConfirmed.forEach(k => add(k, 'analysis'));
   }
+  // extra node edges: parentKey → extra:id
+  confirmed.filter(k => k.startsWith('extra:')).forEach(extraKey => {
+    const id = extraKey.slice(6);
+    const parentKey = extraFields?.[id]?.parentKey ?? 'background';
+    add(parentKey, extraKey);
+  });
 
   return edges;
 }
@@ -116,6 +122,7 @@ function buildNodes(
   suggested: string[],
   onConfirm: (key: string) => void,
   aiLoading: boolean,
+  onAddAfter: (parentKey: string, label: string) => void,
 ): Node[] {
   const pid = project.id;
   const id = (k: string) => `${pid}-${k}`;
@@ -125,36 +132,44 @@ function buildNodes(
     background: OVERVIEW_POS,
   };
 
-  // Position layer 2: confirmed content + ghost suggestions
   const layer2Keys = [...new Set([
-    ...confirmed.filter(k => k !== 'header' && k !== 'background' && k !== 'materials' && k !== 'analysis'),
+    ...confirmed.filter(k => k !== 'header' && k !== 'background' && k !== 'materials' && k !== 'analysis' && !k.startsWith('extra:')),
     ...suggested.filter(k => k !== 'materials' && k !== 'analysis'),
   ])];
   Object.assign(positions, layerPositions(layer2Keys, 2));
 
-  // Materials always far left of layer 2
   if (confirmed.includes('materials') || suggested.includes('materials')) {
     const l2y = 220 + 2 * 240;
     positions['materials'] = { x: (positions[layer2Keys[0]]?.x ?? 60) - 380, y: l2y };
   }
-
-  // Analysis always at right of layer 2
   if (confirmed.includes('analysis') || suggested.includes('analysis')) {
     const l2y = 220 + 2 * 240;
     const lastX = layer2Keys.length > 0 ? (positions[layer2Keys[layer2Keys.length - 1]]?.x ?? 320) : 320;
     positions['analysis'] = { x: lastX + 380, y: l2y };
   }
 
-  const nodes: Node[] = [];
-
-  // Header
-  nodes.push({
-    id: id('header'), type: 'project-header',
-    position: HEADER_POS,
-    data: { projectId: pid },
+  // Position extra:* nodes: group by parent, spread horizontally below parent
+  const extraConfirmed = confirmed.filter(k => k.startsWith('extra:'));
+  const extraByParent: Record<string, string[]> = {};
+  extraConfirmed.forEach(extraKey => {
+    const eid = extraKey.slice(6);
+    const parentKey = project.extraFields?.[eid]?.parentKey ?? 'background';
+    if (!extraByParent[parentKey]) extraByParent[parentKey] = [];
+    extraByParent[parentKey].push(extraKey);
+  });
+  Object.entries(extraByParent).forEach(([parentKey, keys]) => {
+    const parentPos = positions[parentKey] ?? OVERVIEW_POS;
+    const total = keys.length;
+    const startX = parentPos.x - ((total - 1) * 290) / 2;
+    keys.forEach((extraKey, i) => {
+      positions[extraKey] = { x: startX + i * 290, y: parentPos.y + 270 };
+    });
   });
 
-  // Build all node keys
+  const nodes: Node[] = [];
+
+  nodes.push({ id: id('header'), type: 'project-header', position: HEADER_POS, data: { projectId: pid } });
+
   const allKeys = ['background', ...layer2Keys, 'materials', 'analysis'];
   for (const key of allKeys) {
     const entry = NODE_LIBRARY[key];
@@ -172,12 +187,10 @@ function buildNodes(
         nodes.push({
           id: id(key), type: 'field', position: pos,
           data: {
-            projectId: pid,
-            fieldKey: entry.fieldKey,
-            label: entry.label,
-            placeholder: entry.description,
-            category: key,
-            iconName: entry.icon,
+            projectId: pid, fieldKey: entry.fieldKey,
+            label: entry.label, placeholder: entry.description,
+            category: key, iconName: entry.icon,
+            nodeKey: key, onAddAfter,
           } satisfies FieldNodeData,
         });
       }
@@ -193,6 +206,24 @@ function buildNodes(
       });
     }
   }
+
+  // Extra custom nodes
+  extraConfirmed.forEach(extraKey => {
+    const eid = extraKey.slice(6);
+    const field = project.extraFields?.[eid];
+    if (!field) return;
+    const pos = positions[extraKey] ?? { x: 320, y: 700 };
+    nodes.push({
+      id: id(extraKey), type: 'field', position: pos,
+      data: {
+        projectId: pid, fieldKey: '__extra__' as keyof Project,
+        customId: eid, label: field.label,
+        placeholder: `在这里记录「${field.label}」相关内容…`,
+        category: extraKey, iconName: 'Lightbulb',
+        nodeKey: extraKey, onAddAfter,
+      } satisfies FieldNodeData,
+    });
+  });
 
   return nodes;
 }
@@ -386,6 +417,24 @@ export default function ProjectWorkshop() {
     updateProject(selectedId, { confirmedNodes: nextConfirmed, suggestedNodes: nextSuggested } as Partial<Project>);
   }, [selectedId, projects, updateProject]);
 
+  // Add a free-form custom node from any existing node
+  const addCustomNode = useCallback((parentKey: string, label: string) => {
+    if (!selectedId) return;
+    const project = projects.find(p => p.id === selectedId);
+    if (!project) return;
+    const customId = `c${Date.now()}`;
+    const extraKey = `extra:${customId}`;
+    const nextConfirmed = [...new Set([...(project.confirmedNodes ?? ['header']), extraKey])];
+    const nextExtra = {
+      ...(project.extraFields ?? {}),
+      [customId]: { label, content: '', parentKey },
+    };
+    updateProject(selectedId, {
+      confirmedNodes: nextConfirmed,
+      extraFields: nextExtra,
+    } as Partial<Project>);
+  }, [selectedId, projects, updateProject]);
+
   // After background is confirmed with content → ask AI for next nodes
   useEffect(() => {
     if (!selectedProject) return;
@@ -402,12 +451,13 @@ export default function ProjectWorkshop() {
   }, [confirmed.join(','), selectedProject?.background]);
 
   // Rebuild canvas
+  const extraFieldsKey = JSON.stringify(selectedProject?.extraFields ?? {});
   useEffect(() => {
     if (!selectedId || !selectedProject) { setNodes([]); setEdges([]); return; }
-    setNodes(buildNodes(selectedProject, confirmed, suggested, confirmNode, aiLoading));
-    setEdges(buildEdges(selectedId, confirmed, suggested));
+    setNodes(buildNodes(selectedProject, confirmed, suggested, confirmNode, aiLoading, addCustomNode));
+    setEdges(buildEdges(selectedId, confirmed, suggested, selectedProject.extraFields));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, confirmed.join(','), suggested.join(','), aiLoading]);
+  }, [selectedId, confirmed.join(','), suggested.join(','), aiLoading, extraFieldsKey]);
 
   // Create project directly — no modal
   const handleNewProject = useCallback(() => {

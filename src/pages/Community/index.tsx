@@ -6,6 +6,7 @@ import {
   Send, X, Tag, Hash, TrendingUp,
 } from 'lucide-react';
 import { useT } from '../../hooks/useT';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 import {
   BOARDS, HOT_TAGS, MOCK_POSTS,
   type Post, type Comment, type BoardId,
@@ -701,6 +702,7 @@ const btnSecondaryStyle: React.CSSProperties = {
 // ?? Main Community Page ????????????????????????????????????????????????????????
 export default function CommunityPage() {
   const tc = useT().community;
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   const [selectedBoard, setSelectedBoard] = useState<BoardId | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -752,6 +754,9 @@ export default function CommunityPage() {
     return counts;
   }, [posts]);
 
+  const hPad = isMobile ? '14px 16px 0' : isTablet ? '18px 20px 0' : '24px 32px 0';
+  const contentPad = isMobile ? '14px 16px' : isTablet ? '16px 20px' : '20px 24px';
+
   return (
     <div style={{
       height: '100%', display: 'flex', flexDirection: 'column',
@@ -759,29 +764,29 @@ export default function CommunityPage() {
     }}>
       {/* Page header */}
       <div style={{
-        padding: '24px 32px 0',
+        padding: hPad,
         borderBottom: `1px solid ${T.border}`,
         background: T.bg,
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Users size={20} color={T.accent} />
-              <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: 0 }}>{tc.title}</h1>
+              <Users size={isMobile ? 17 : 20} color={T.accent} />
+              <h1 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700, color: T.text, margin: 0 }}>{tc.title}</h1>
             </div>
-            <p style={{ fontSize: 13, color: T.textSec, margin: '4px 0 0' }}>{tc.subtitle}</p>
+            {!isMobile && <p style={{ fontSize: 13, color: T.textSec, margin: '4px 0 0' }}>{tc.subtitle}</p>}
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 7,
               background: T.accent, color: '#fff', border: 'none',
-              borderRadius: 10, padding: '9px 18px',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              borderRadius: 10, padding: isMobile ? '7px 12px' : '9px 18px',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
             }}
           >
-            <Plus size={15} /> {tc.createPost}
+            <Plus size={15} /> {!isMobile && tc.createPost}
           </button>
         </div>
 
@@ -789,7 +794,7 @@ export default function CommunityPage() {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
           background: 'rgba(0,0,0,0.04)', border: `1px solid ${T.border}`,
-          borderRadius: 10, padding: '9px 14px', marginBottom: 20,
+          borderRadius: 10, padding: '8px 14px', marginBottom: 14,
         }}>
           <Search size={15} color={T.textMuted} />
           <input
@@ -807,38 +812,78 @@ export default function CommunityPage() {
             </button>
           )}
         </div>
+
+        {/* Mobile/tablet: board tabs (horizontal scrollable) */}
+        {!isDesktop && (
+          <div style={{
+            display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12,
+            scrollbarWidth: 'none', msOverflowStyle: 'none',
+          }}>
+            <button
+              onClick={() => { setSelectedBoard('all'); setSelectedPost(null); }}
+              style={{
+                flexShrink: 0, padding: '5px 12px', borderRadius: 99,
+                border: `1px solid ${selectedBoard === 'all' ? T.accentBorder : T.border}`,
+                background: selectedBoard === 'all' ? T.accentDim : 'transparent',
+                color: selectedBoard === 'all' ? T.accent : T.textSec,
+                fontSize: 12, fontWeight: selectedBoard === 'all' ? 600 : 400,
+                cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              {tc.boards.all}
+            </button>
+            {BOARDS.map(b => (
+              <button
+                key={b.id}
+                onClick={() => { setSelectedBoard(b.id); setSelectedPost(null); }}
+                style={{
+                  flexShrink: 0, padding: '5px 12px', borderRadius: 99,
+                  border: `1px solid ${selectedBoard === b.id ? T.accentBorder : T.border}`,
+                  background: selectedBoard === b.id ? T.accentDim : 'transparent',
+                  color: selectedBoard === b.id ? T.accent : T.textSec,
+                  fontSize: 12, fontWeight: selectedBoard === b.id ? 600 : 400,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                {b.emoji} {tc.boards[b.id]}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Body: 3 columns */}
+      {/* Body */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-        {/* Left: Board navigation */}
-        <div style={{
-          width: 220, flexShrink: 0,
-          borderRight: `1px solid ${T.border}`,
-          padding: '16px 12px',
-          overflowY: 'auto',
-        }}>
-          {/* All boards */}
-          <BoardNavItem
-            label={tc.boards.all}
-            count={totalPosts}
-            active={selectedBoard === 'all'}
-            onClick={() => { setSelectedBoard('all'); setSelectedPost(null); }}
-          />
-          <div style={{ height: 8 }} />
-          {BOARDS.map(b => (
+
+        {/* Left: Board navigation — desktop only */}
+        {isDesktop && (
+          <div style={{
+            width: 220, flexShrink: 0,
+            borderRight: `1px solid ${T.border}`,
+            padding: '16px 12px',
+            overflowY: 'auto',
+          }}>
             <BoardNavItem
-              key={b.id}
-              label={`${b.emoji} ${tc.boards[b.id]}`}
-              count={boardCounts[b.id] ?? 0}
-              active={selectedBoard === b.id}
-              onClick={() => { setSelectedBoard(b.id); setSelectedPost(null); }}
+              label={tc.boards.all}
+              count={totalPosts}
+              active={selectedBoard === 'all'}
+              onClick={() => { setSelectedBoard('all'); setSelectedPost(null); }}
             />
-          ))}
-        </div>
+            <div style={{ height: 8 }} />
+            {BOARDS.map(b => (
+              <BoardNavItem
+                key={b.id}
+                label={`${b.emoji} ${tc.boards[b.id]}`}
+                count={boardCounts[b.id] ?? 0}
+                active={selectedBoard === b.id}
+                onClick={() => { setSelectedBoard(b.id); setSelectedPost(null); }}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Main content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: contentPad, minWidth: 0 }}>
           <AnimatePresence mode="wait">
             {selectedPost ? (
               <PostDetail
@@ -853,7 +898,7 @@ export default function CommunityPage() {
               <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 {filteredPosts.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>??</div>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
                     <div style={{ fontSize: 15, color: T.textSec }}>{tc.noPost}</div>
                     <div style={{ fontSize: 13, color: T.textMuted, marginTop: 6 }}>{tc.noPostHint}</div>
                   </div>
@@ -876,91 +921,93 @@ export default function CommunityPage() {
           </AnimatePresence>
         </div>
 
-        {/* Right: Hot tags & trending */}
-        <div style={{
-          width: 220, flexShrink: 0,
-          borderLeft: `1px solid ${T.border}`,
-          padding: '16px 16px',
-          overflowY: 'auto',
-        }}>
-          {/* Hot tags */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-              <Hash size={13} color={T.accent} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{tc.hotTags}</span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {HOT_TAGS.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => { setSearchQuery(tag.replace('#', '')); setSelectedPost(null); }}
-                  style={{
-                    fontSize: 11, color: T.textSec,
-                    background: 'rgba(0,0,0,0.04)',
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 8, padding: '3px 10px',
-                    cursor: 'pointer', transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.color = T.accent;
-                    (e.currentTarget as HTMLElement).style.borderColor = T.accentBorder;
-                    (e.currentTarget as HTMLElement).style.background = T.accentDim;
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.color = T.textSec;
-                    (e.currentTarget as HTMLElement).style.borderColor = T.border;
-                    (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)';
-                  }}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Trending posts */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-              <TrendingUp size={13} color={T.accent} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{tc.trending}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {posts
-                .slice()
-                .sort((a, b) => b.views - a.views)
-                .slice(0, 5)
-                .map((post, idx) => (
+        {/* Right: Hot tags & trending — desktop + tablet only */}
+        {!isMobile && (
+          <div style={{
+            width: isTablet ? 180 : 220, flexShrink: 0,
+            borderLeft: `1px solid ${T.border}`,
+            padding: '16px',
+            overflowY: 'auto',
+          }}>
+            {/* Hot tags */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <Hash size={13} color={T.accent} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{tc.hotTags}</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {HOT_TAGS.map(tag => (
                   <button
-                    key={post.id}
-                    onClick={() => setSelectedPost(post)}
+                    key={tag}
+                    onClick={() => { setSearchQuery(tag.replace('#', '')); setSelectedPost(null); }}
                     style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10,
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      padding: '8px 6px', borderRadius: 8, textAlign: 'left',
-                      transition: 'background 0.15s', width: '100%',
+                      fontSize: 11, color: T.textSec,
+                      background: 'rgba(0,0,0,0.04)',
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 8, padding: '3px 10px',
+                      cursor: 'pointer', transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.color = T.accent;
+                      (e.currentTarget as HTMLElement).style.borderColor = T.accentBorder;
+                      (e.currentTarget as HTMLElement).style.background = T.accentDim;
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.color = T.textSec;
+                      (e.currentTarget as HTMLElement).style.borderColor = T.border;
+                      (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)';
+                    }}
                   >
-                    <span style={{
-                      fontSize: 11, fontWeight: 700,
-                      color: idx < 3 ? T.accent : T.textMuted,
-                      width: 16, flexShrink: 0, paddingTop: 1,
-                    }}>
-                      {idx + 1}
-                    </span>
-                    <span style={{
-                      fontSize: 12, color: T.textSec, lineHeight: 1.5,
-                      display: '-webkit-box', WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    }}>
-                      {post.title}
-                    </span>
+                    {tag}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Trending posts */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <TrendingUp size={13} color={T.accent} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: T.textSec }}>{tc.trending}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {posts
+                  .slice()
+                  .sort((a, b) => b.views - a.views)
+                  .slice(0, 5)
+                  .map((post, idx) => (
+                    <button
+                      key={post.id}
+                      onClick={() => setSelectedPost(post)}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '8px 6px', borderRadius: 8, textAlign: 'left',
+                        transition: 'background 0.15s', width: '100%',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <span style={{
+                        fontSize: 11, fontWeight: 700,
+                        color: idx < 3 ? T.accent : T.textMuted,
+                        width: 16, flexShrink: 0, paddingTop: 1,
+                      }}>
+                        {idx + 1}
+                      </span>
+                      <span style={{
+                        fontSize: 12, color: T.textSec, lineHeight: 1.5,
+                        display: '-webkit-box', WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                      }}>
+                        {post.title}
+                      </span>
+                    </button>
+                  ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Create post modal */}

@@ -65,7 +65,13 @@ export async function suggestProjectNodes(name: string, overview: string): Promi
   return keys;
 }
 
-// ── 3. Project Workshop: AI complete a field ─────────────────────────────────
+// ── 3a. Project Workshop: research background from project name ───────────────
+export async function researchProjectBackground(projectName: string): Promise<string> {
+  const { text } = await post<{ text: string }>('/api/project/research-background', { projectName });
+  return text;
+}
+
+// ── 3b. Project Workshop: AI complete a field ────────────────────────────────
 export async function completeProjectField(context: string, fieldLabel: string): Promise<string> {
   const { text } = await post<{ text: string }>('/api/project/complete-field', { context, fieldLabel });
   return text;
