@@ -16,6 +16,25 @@ const embeddings = new GoogleGenerativeAIEmbeddings({
   outputDimensionality: 768,
 });
 
+const STOP_TERMS = new Set([
+  '如何', '怎么', '怎样', '什么', '为什么', '哪些', '可以', '是否', '有没有',
+  '一个', '这个', '那个', '进行', '使用', '帮助', '设计', '作品集',
+  'the', 'and', 'for', 'with', 'how', 'what', 'why', 'can',
+]);
+
+function cleanKeyword(k) {
+  return String(k ?? '')
+    .trim()
+    .replace(/[%,.*()[\]{}]/g, '')
+    .toLowerCase();
+}
+
+function normalizeKeywords(keywords) {
+  return [...new Set((keywords ?? []).map(cleanKeyword))]
+    .filter((k) => k.length >= 2 && !STOP_TERMS.has(k))
+    .slice(0, 10);
+}
+
 // ── Shared: get embedding vector ──────────────────────────────────────────────
 export async function getEmbedding(text) {
   return embeddings.embedQuery(text);
@@ -68,16 +87,17 @@ export async function vectorSearchCommunity(query, { threshold = 0.42, count = 4
 
 // ── Keyword search: knowledge nodes (ilike, no new RPC needed) ────────────────
 export async function keywordSearchKnowledge(keywords) {
-  if (!keywords?.length) return [];
-  const orFilter = keywords
-    .flatMap((k) => [`title_zh.ilike.%${k}%`, `content_zh.ilike.%${k}%`])
+  const terms = normalizeKeywords(keywords);
+  if (!terms.length) return [];
+  const orFilter = terms
+    .flatMap((k) => [`title_zh.ilike.%${k}%`, `content_zh.ilike.%${k}%`, `title_en.ilike.%${k}%`, `content_en.ilike.%${k}%`])
     .join(',');
   const { data } = await supabase
     .from('knowledge_nodes')
     .select('id, title_zh, content_zh, type, tags, level')
     .or(orFilter)
     .neq('type', 'branch')
-    .limit(5);
+    .limit(8);
   return (data ?? []).map((n) => ({
     id: n.id,
     title: n.title_zh,
@@ -85,15 +105,16 @@ export async function keywordSearchKnowledge(keywords) {
     type: n.type,
     tags: n.tags ?? [],
     level: n.level,
-    similarity: 0.55,  // keyword results get a moderate base score
+    similarity: 0.42,  // keyword-only candidates still need rerank evidence
     source: 'keyword',
   }));
 }
 
 // ── Keyword search: community posts ──────────────────────────────────────────
 export async function keywordSearchCommunity(keywords) {
-  if (!keywords?.length) return [];
-  const orFilter = keywords
+  const terms = normalizeKeywords(keywords);
+  if (!terms.length) return [];
+  const orFilter = terms
     .flatMap((k) => [`title.ilike.%${k}%`, `content.ilike.%${k}%`])
     .join(',');
   const { data } = await supabase
@@ -109,7 +130,7 @@ export async function keywordSearchCommunity(keywords) {
     likes: p.likes ?? 0,
     views: p.views ?? 0,
     comments: 0,
-    similarity: 0.5,
+    similarity: 0.35,
     source: 'keyword',
   }));
 }

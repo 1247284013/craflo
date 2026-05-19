@@ -4,7 +4,8 @@
   "description": "Craflo LangChain Agent backend with LangSmith tracing",
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.mjs",
+    "dev": "node src/index.mjs",
+    "dev:watch": "node --watch src/index.mjs",
     "start": "node src/index.mjs",
     "studio": "npx @langchain/langgraph-cli@latest dev --port 2024"
   },

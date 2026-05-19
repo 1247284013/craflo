@@ -103,6 +103,57 @@ function dedup(arr) {
   });
 }
 
+const STOP_TERMS = new Set([
+  '如何', '怎么', '怎样', '什么', '为什么', '哪些', '可以', '是否', '有没有',
+  '一个', '这个', '那个', '进行', '使用', '帮助', '设计', '作品集',
+  'the', 'and', 'for', 'with', 'how', 'what', 'why', 'can',
+]);
+
+function normalizeText(text = '') {
+  return String(text).toLowerCase().replace(/\s+/g, '');
+}
+
+function extractTerms(...inputs) {
+  const raw = inputs
+    .flat()
+    .filter(Boolean)
+    .join(' ');
+
+  const terms = raw.match(/[\u4e00-\u9fa5a-zA-Z0-9]{2,}/g) ?? [];
+  const cleaned = terms
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length >= 2 && !STOP_TERMS.has(t));
+
+  // Add short Chinese bigrams for phrases like "技能水平可视化".
+  const bigrams = [];
+  for (const term of cleaned) {
+    if (/^[\u4e00-\u9fa5]{4,}$/.test(term)) {
+      for (let i = 0; i < term.length - 1; i += 1) {
+        const bg = term.slice(i, i + 2);
+        if (!STOP_TERMS.has(bg)) bigrams.push(bg);
+      }
+    }
+  }
+
+  return [...new Set([...cleaned, ...bigrams])].slice(0, 24);
+}
+
+function inferToolTerms(query, keywords = []) {
+  const text = normalizeText([query, ...keywords].join(' '));
+  const inferred = [];
+
+  // Domain aliases bridge user intent to tool names stored in the knowledge base.
+  if (/(技能|能力|水平|熟练度|胜任力|维度|画像).*(可视化|图|展示|表达|评估)|雷达|radar/.test(text)) {
+    inferred.push('雷达图', '技能水平', '能力评估', '多维度可视化');
+  }
+
+  if (/(形态|矩阵|方案组合|设计空间|概念生成|系统性|系统思维|组合创新|morphological)/.test(text)) {
+    inferred.push('形态学矩阵', '方案组合', '设计空间', '系统性思维');
+  }
+
+  return inferred;
+}
+
 function getLLMText(response) {
   const c = response.content;
   if (typeof c === 'string') return c;
@@ -227,8 +278,16 @@ ${issueDesc}`,
 
   return {
     rewrittenQuery: parsed.rewrittenQuery ?? state.query,
-    searchQueries:  parsed.searchQueries  ?? [state.query],
-    keywords:       parsed.keywords       ?? [state.query],
+    searchQueries: [
+      ...(parsed.searchQueries ?? [state.query]),
+      ...inferToolTerms(state.query, parsed.keywords ?? []),
+    ],
+    keywords: [
+      ...new Set([
+        ...(parsed.keywords ?? [state.query]),
+        ...inferToolTerms(state.query, parsed.keywords ?? []),
+      ]),
+    ],
   };
 }
 
@@ -237,7 +296,14 @@ ${issueDesc}`,
 // 向量相似度检索 + 关键词检索（并行执行）
 // ─────────────────────────────────────────────────────────────────────────────
 async function hybridRetrieve(state) {
-  const allQueries = [state.rewrittenQuery, ...state.searchQueries].filter(Boolean);
+  const inferredTerms = inferToolTerms(state.query, state.keywords);
+  const allQueries = [
+    state.query,
+    state.rewrittenQuery,
+    ...state.searchQueries,
+    inferredTerms.join(' '),
+  ].filter(Boolean);
+  const allKeywords = [...new Set([...state.keywords, ...inferredTerms])];
 
   // Run all retrieval tasks in parallel
   const [
@@ -249,16 +315,16 @@ async function hybridRetrieve(state) {
     // Vector search using primary rewritten query + secondary queries
     (async () => {
       const results = await Promise.all(
-        allQueries.slice(0, 2).map((q) => vectorSearchKnowledge(q, { threshold: 0.42, count: 6 })),
+        allQueries.slice(0, 4).map((q) => vectorSearchKnowledge(q, { threshold: 0.40, count: 8 })),
       );
       return dedup(results.flat());
     })(),
     // Vector search community posts
-    vectorSearchCommunity(state.rewrittenQuery, { threshold: 0.42, count: 4 }),
+    vectorSearchCommunity(state.rewrittenQuery, { threshold: 0.48, count: 4 }),
     // Keyword search knowledge nodes
-    keywordSearchKnowledge(state.keywords),
+    keywordSearchKnowledge(allKeywords),
     // Keyword search community posts
-    keywordSearchCommunity(state.keywords),
+    keywordSearchCommunity(allKeywords),
   ]);
 
   const rawNodes = dedup([
@@ -280,31 +346,68 @@ async function hybridRetrieve(state) {
 // Hybrid score = vector_similarity * 0.65 + keyword_bonus * 0.35
 // ─────────────────────────────────────────────────────────────────────────────
 async function rerankResults(state) {
-  const { rawNodes, rawPosts, rewrittenQuery, keywords, query } = state;
+  const { rawNodes, rawPosts, keywords, query, rewrittenQuery } = state;
 
-  // Build keyword set for scoring
-  const kwSet = new Set(
-    [...keywords, ...query.split(/\s+/)].map((k) => k.toLowerCase()).filter((k) => k.length >= 2),
-  );
+  const inferredTerms = inferToolTerms(query, keywords);
+  const queryTerms = extractTerms(query, rewrittenQuery, keywords, inferredTerms);
+  const queryTermSet = new Set(queryTerms);
 
   function score(item) {
-    const text = `${item.title ?? ''} ${item.content ?? item.summary ?? ''}`.toLowerCase();
-    const kwHits = [...kwSet].filter((k) => text.includes(k)).length;
-    const kwScore = Math.min(kwHits / Math.max(kwSet.size, 1), 1.0);
-    // Boost items from vector search by their similarity, keyword-only gets 0.5 base
+    const title = normalizeText(item.title ?? '');
+    const body = normalizeText(item.content ?? item.summary ?? '');
+    const text = `${title}${body}`;
+
+    const hits = [...queryTermSet].filter((k) => text.includes(normalizeText(k)));
+    const titleHits = hits.filter((k) => title.includes(normalizeText(k)));
+    const keywordCoverage = Math.min(hits.length / Math.max(Math.min(queryTermSet.size, 6), 1), 1);
+    const titleCoverage = Math.min(titleHits.length / Math.max(Math.min(queryTermSet.size, 4), 1), 1);
+
     const vecScore = item.similarity ?? 0;
-    return vecScore * 0.65 + kwScore * 0.35;
+    const titleBoost = titleCoverage * 0.22;
+    const exactToolBoost = inferredTerms.some((t) => title.includes(normalizeText(t))) ? 0.18 : 0;
+
+    return Math.min(
+      vecScore * 0.52 +
+      keywordCoverage * 0.28 +
+      titleBoost +
+      exactToolBoost,
+      1,
+    );
+  }
+
+  function keepNode(n) {
+    const title = normalizeText(n.title ?? '');
+    const text = `${title}${normalizeText(n.content ?? '')}`;
+    const hits = queryTerms.filter((k) => text.includes(normalizeText(k)));
+    const titleHit = hits.some((k) => title.includes(normalizeText(k)));
+    const exactToolHit = inferredTerms.some((t) => title.includes(normalizeText(t)));
+    const sim = n.similarity ?? 0;
+    const s = n._score ?? 0;
+
+    return exactToolHit || titleHit || sim >= 0.48 || (s >= 0.38 && hits.length > 0);
+  }
+
+  function keepPost(p) {
+    const text = normalizeText(`${p.title ?? ''}${p.summary ?? ''}`);
+    const hits = queryTerms.filter((k) => text.includes(normalizeText(k)));
+    const sim = p.similarity ?? 0;
+    const s = p._score ?? 0;
+
+    // Community posts are more likely to be noisy, so require stronger evidence.
+    return sim >= 0.56 || (s >= 0.44 && hits.length >= 2);
   }
 
   const relatedNodes = [...rawNodes]
     .map((n) => ({ ...n, _score: score(n) }))
+    .filter(keepNode)
     .sort((a, b) => b._score - a._score)
-    .slice(0, 5);
+    .slice(0, 4);
 
   const relatedPosts = [...rawPosts]
     .map((p) => ({ ...p, _score: score(p) }))
+    .filter(keepPost)
     .sort((a, b) => b._score - a._score)
-    .slice(0, 3);
+    .slice(0, 2);
 
   return { relatedNodes, relatedPosts };
 }
@@ -314,7 +417,7 @@ async function rerankResults(state) {
 // 文档相关性评估 + 上下文组装
 // ─────────────────────────────────────────────────────────────────────────────
 async function gradeDocs(state) {
-  const MIN_SCORE = 0.25;
+  const MIN_SCORE = 0.34;
 
   const qualityNodes = state.relatedNodes.filter((n) => (n._score ?? 0) >= MIN_SCORE);
   const qualityPosts = state.relatedPosts.filter((p) => (p._score ?? 0) >= MIN_SCORE);
