@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { useSettingsStore, ACCENT_COLORS } from '../../store/useSettingsStore';
 
 export function AppLayout() {
-  const { bp, isMobile, isTablet } = useBreakpoint();
+  const { isMobile, isTablet } = useBreakpoint();
   const { accentColor } = useSettingsStore();
   const colors = ACCENT_COLORS[accentColor];
 

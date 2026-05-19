@@ -4,7 +4,7 @@ import {
   CheckCircle, Circle, ChevronDown, ChevronUp,
   BookOpen, Target, Award, Clock, ArrowRight,
   Sparkles, X, Send, Loader2, Check,
-  BookMarked, Wrench, Package, ChevronRight,
+  BookMarked, Wrench, Package,
   TrendingUp,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
