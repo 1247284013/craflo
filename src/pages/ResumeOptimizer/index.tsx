@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { FileText, Plus, Sparkles, Copy, CheckCircle, Trash2, X } from 'lucide-react';
+import { FileText, Plus, Sparkles, Copy, CheckCircle, Trash2, X, Briefcase, BarChart2, Target, Lightbulb, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { generateResumeItem } from '../../utils/mockAI';
 import type { TargetRole } from '../../types';
 import { Card, Badge, PageHeader, EmptyState, AIFeedbackBox } from '../../components/UI';
 import { Button } from '../../components/UI';
 import { useT } from '../../hooks/useT';
+import { JDUploadDrawer } from '../../components/JDUploadDrawer';
+import { analyzeJDGap } from '../../lib/agentAPI';
+import type { ParsedJDResponse, GapAnalysis } from '../../lib/agentAPI';
 
 function AddResumeModal({ onClose }: { onClose: () => void }) {
   const { projects, targetRole, addResumeItem } = useAppStore();
@@ -153,6 +156,139 @@ function AddResumeModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// JD Analysis Banner — "投递此岗位" section at the top
+// ─────────────────────────────────────────────────────────────────────────────
+function JDAnalysisBanner() {
+  const { appliedJD, setAppliedJD, projects, skillAssessment } = useAppStore();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [gap, setGap] = useState<GapAnalysis | null>(appliedJD?.gapAnalysis ? {
+    gapAnalysis: appliedJD.gapAnalysis,
+    emphasize: appliedJD.emphasize ?? [],
+    interviewFocus: appliedJD.interviewFocus ?? [],
+    fitScore: 0,
+  } : null);
+
+  const handleParsed = async (raw: string, parsed: ParsedJDResponse, source: 'text' | 'image') => {
+    const jd = { raw, parsed, source, savedAt: new Date().toISOString() };
+    setAppliedJD(jd);
+    setAnalyzing(true);
+    try {
+      const userSkills = [
+        ...(skillAssessment?.strengths ?? []),
+        ...(skillAssessment?.priorityAreas ?? []),
+      ];
+      const projectSummaries = projects.map(p => `${p.name}: ${p.background?.slice(0, 80) ?? ''}`);
+      const analysis = await analyzeJDGap(parsed, userSkills, projectSummaries);
+      setGap(analysis);
+      setAppliedJD({ ...jd, gapAnalysis: analysis.gapAnalysis, emphasize: analysis.emphasize, interviewFocus: analysis.interviewFocus });
+    } catch {
+      // gap analysis is optional — don't block if it fails
+    }
+    setAnalyzing(false);
+  };
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      {!appliedJD ? (
+        /* Empty state */
+        <button
+          onClick={() => setDrawerOpen(true)}
+          style={{
+            width: '100%', textAlign: 'left', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 14,
+            padding: '16px 20px', borderRadius: 16,
+            border: '2px dashed rgba(99,102,241,0.3)',
+            background: 'rgba(99,102,241,0.03)', transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.5)'; (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.06)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)'; (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.03)'; }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 13, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Briefcase size={20} color="#6366f1" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>投递此岗位</div>
+            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>上传目标 JD，AI 分析技能 gap，优化简历重点和面试准备方向</div>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6366f1', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, padding: '6px 12px', flexShrink: 0 }}>
+            上传 JD →
+          </div>
+        </button>
+      ) : (
+        /* Has JD — show summary + analysis */
+        <div style={{ border: '1.5px solid rgba(99,102,241,0.2)', borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+          {/* JD header bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'rgba(99,102,241,0.04)', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Briefcase size={16} color="#6366f1" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {appliedJD.parsed.title}{appliedJD.parsed.company ? ` · ${appliedJD.parsed.company}` : ''}
+              </div>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>
+                {appliedJD.parsed.summary ?? '已解析目标岗位'}
+              </div>
+            </div>
+            <button
+              onClick={() => setDrawerOpen(true)}
+              style={{ fontSize: 12, fontWeight: 600, color: '#6366f1', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', flexShrink: 0 }}
+            >
+              更换
+            </button>
+          </div>
+
+          {/* Analysis results */}
+          {analyzing ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', color: '#6b7280', fontSize: 13 }}>
+              <Loader2 size={16} color="#6366f1" style={{ animation: 'spin 1s linear infinite' }} />
+              AI 正在分析技能 gap…
+            </div>
+          ) : gap ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 0 }}>
+              <AnalysisSection icon={<BarChart2 size={14} color="#ef4444" />} title="技能 Gap" items={gap.gapAnalysis} color="#ef4444" bg="rgba(239,68,68,0.04)" />
+              <AnalysisSection icon={<Target size={14} color="#6366f1" />} title="简历侧重点" items={gap.emphasize} color="#6366f1" bg="rgba(99,102,241,0.04)" />
+              <AnalysisSection icon={<Lightbulb size={14} color="#f59e0b" />} title="面试准备方向" items={gap.interviewFocus} color="#f59e0b" bg="rgba(245,158,11,0.04)" />
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      <JDUploadDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onParsed={handleParsed}
+        title="投递此岗位"
+        subtitle="上传目标 JD，AI 分析技能 gap，给出简历优化建议"
+      />
+    </div>
+  );
+}
+
+function AnalysisSection({ icon, title, items, color, bg }: {
+  icon: React.ReactNode; title: string; items: string[]; color: string; bg: string;
+}) {
+  if (!items.length) return null;
+  return (
+    <div style={{ padding: '12px 16px', borderRight: '1px solid rgba(0,0,0,0.06)', background: bg }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        {icon}
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {items.slice(0, 3).map((item, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <div style={{ width: 5, height: 5, borderRadius: '50%', background: color, flexShrink: 0, marginTop: 6 }} />
+            <span style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ResumeOptimizer() {
   const { resumeItems, deleteResumeItem } = useAppStore();
   const [showModal, setShowModal] = useState(false);
@@ -181,6 +317,9 @@ export default function ResumeOptimizer() {
           </Button>
         }
       />
+
+      {/* ── JD Analysis Banner ── */}
+      <JDAnalysisBanner />
 
       {/* Tip */}
       <AIFeedbackBox

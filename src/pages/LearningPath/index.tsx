@@ -5,7 +5,7 @@ import {
   BookOpen, Target, Award, Clock, ArrowRight,
   Sparkles, X, Send, Loader2, Check,
   BookMarked, Wrench, Package,
-  TrendingUp,
+  TrendingUp, Briefcase, Edit3, Plus,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { Card, Progress, PageHeader, EmptyState, Badge } from '../../components/UI';
@@ -13,7 +13,9 @@ import { useNavigate } from 'react-router-dom';
 import { useT } from '../../hooks/useT';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import type { WeeklyTask, LearningPhase } from '../../types';
-import { adjustLearningPath } from '../../lib/agentAPI';
+import { adjustLearningPath, planWithJD } from '../../lib/agentAPI';
+import { JDUploadDrawer } from '../../components/JDUploadDrawer';
+import type { ParsedJDResponse, JDPlanResult } from '../../lib/agentAPI';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type AdjustStatus = 'idle' | 'thinking' | 'preview' | 'done';
@@ -426,22 +428,131 @@ function PhaseSection({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TargetJobCard — shows the saved career-direction JD or an "add JD" prompt
+// ─────────────────────────────────────────────────────────────────────────────
+function TargetJobCard({ onOpenDrawer }: { onOpenDrawer: () => void }) {
+  const { targetJD } = useAppStore();
+
+  if (!targetJD) {
+    return (
+      <button
+        onClick={onOpenDrawer}
+        style={{
+          width: '100%', textAlign: 'left',
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '14px 18px', borderRadius: 14, cursor: 'pointer',
+          border: '1.5px dashed rgba(99,102,241,0.35)',
+          background: 'rgba(99,102,241,0.03)',
+          marginBottom: 20, transition: 'all 0.15s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.6)'; (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.06)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.35)'; (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.03)'; }}
+      >
+        <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Plus size={17} color="#6366f1" />
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#6366f1' }}>设置目标岗位 JD</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>上传或粘贴职位描述，让学习计划更有针对性</div>
+        </div>
+        <ArrowRight size={14} color="#9ca3af" style={{ marginLeft: 'auto' }} />
+      </button>
+    );
+  }
+
+  const { parsed } = targetJD;
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 14,
+        padding: '14px 18px', borderRadius: 14,
+        border: '1.5px solid rgba(99,102,241,0.2)',
+        background: 'rgba(99,102,241,0.04)',
+        marginBottom: 20,
+      }}
+    >
+      <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Briefcase size={17} color="#6366f1" />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em' }}>目标岗位</span>
+          <span style={{ fontSize: 10, color: '#d1d5db', padding: '1px 6px', background: 'rgba(99,102,241,0.08)', borderRadius: 6 }}>
+            {new Date(targetJD.savedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+          </span>
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{parsed.title}{parsed.company ? ` · ${parsed.company}` : ''}</div>
+        {parsed.summary && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>{parsed.summary}</div>}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+          {parsed.keywords.slice(0, 5).map((kw, i) => (
+            <span key={i} style={{ fontSize: 11, color: '#6366f1', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>
+              {kw}
+            </span>
+          ))}
+          {parsed.keywords.length > 5 && (
+            <span style={{ fontSize: 11, color: '#9ca3af' }}>+{parsed.keywords.length - 5}</span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onOpenDrawer}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 4, flexShrink: 0 }}
+        title="更新目标 JD"
+      >
+        <Edit3 size={14} />
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LearningPathPage() {
   const navigate = useNavigate();
-  const { learningPath, currentWeek, completeWeekTask, setCurrentWeek, updateWeeklyTasks } = useAppStore();
+  const { learningPath, currentWeek, completeWeekTask, setCurrentWeek, updateWeeklyTasks, targetJD, setTargetJD } = useAppStore();
   const { isMobile } = useBreakpoint();
   const tl = useT();
   const tpath = tl.learningPath;
 
   const [selectedWeek, setSelectedWeek] = useState<number | null>(currentWeek);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [jdDrawerOpen, setJdDrawerOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [adjustStatus, setAdjustStatus] = useState<AdjustStatus>('idle');
   const [previewTasks, setPreviewTasks] = useState<AdjustedTask[] | null>(null);
+  const [jdPlanResult, setJdPlanResult] = useState<JDPlanResult<WeeklyTask> | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // After JD is saved → auto-trigger path re-planning
+  const handleJDParsed = async (raw: string, parsed: ParsedJDResponse, source: 'text' | 'image') => {
+    setTargetJD({ raw, parsed, source, savedAt: new Date().toISOString() });
+    if (!learningPath?.weeklyTasks?.length) return;
+
+    // Open the panel in "thinking" state immediately
+    setPanelOpen(true);
+    setAdjustStatus('thinking');
+    setErrorMsg('');
+    setPreviewTasks(null);
+    setJdPlanResult(null);
+
+    try {
+      const result = await planWithJD<WeeklyTask>(parsed, learningPath.weeklyTasks, parsed.roleType);
+      setJdPlanResult(result);
+      // Convert to AdjustedTask format for the preview panel
+      const withFlags: AdjustedTask[] = result.tasks.map((t, i) => {
+        const orig = learningPath.weeklyTasks[i];
+        const modified = (t as Record<string, unknown>)['_jdModified'] === true;
+        return { ...t, _modified: modified, _autoCompleted: false };
+      });
+      setPreviewTasks(withFlags);
+      setAdjustStatus('preview');
+    } catch {
+      setErrorMsg('AI 路径规划失败，请检查后端服务是否运行');
+      setAdjustStatus('idle');
+    }
+  };
 
   const handleAIAdjust = async () => {
     if (!inputValue.trim() || !learningPath) return;
@@ -464,10 +575,33 @@ export default function LearningPathPage() {
 
   const handleApply = () => {
     if (!previewTasks) return;
-    const cleanTasks: WeeklyTask[] = previewTasks.map(({ _modified: _m, _autoCompleted: _a, ...t }) => t);
+    const cleanTasks: WeeklyTask[] = previewTasks.map((t) => {
+      // Strip all internal flags and JD markers before saving to store
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _modified: _m, _autoCompleted: _a, ...rest } = t as AdjustedTask & Record<string, unknown>;
+      const task = rest as Record<string, unknown>;
+      delete task['_jdModified'];
+      delete task['_jdRelevance'];
+      delete task['_lowPriority'];
+      // Remove ⭐ / ○ markers from titles so downstream agents get clean text
+      if (typeof task['title'] === 'string') {
+        task['title'] = (task['title'] as string).replace(/^[⭐○]\s+/, '');
+      }
+      // Remove the appended JD relevance note from objectives
+      if (typeof task['objective'] === 'string') {
+        task['objective'] = (task['objective'] as string).replace(/（与岗位要求高度相关）$/, '');
+      }
+      return task as unknown as WeeklyTask;
+    });
     updateWeeklyTasks(cleanTasks);
     setAdjustStatus('done');
-    setTimeout(() => { setPanelOpen(false); setAdjustStatus('idle'); setPreviewTasks(null); setInputValue(''); }, 1500);
+    setTimeout(() => {
+      setPanelOpen(false);
+      setAdjustStatus('idle');
+      setPreviewTasks(null);
+      setInputValue('');
+      setJdPlanResult(null);
+    }, 1500);
   };
 
   if (!learningPath) {
@@ -502,6 +636,18 @@ export default function LearningPathPage() {
       margin: '0 auto',
       position: 'relative',
     }}>
+
+      {/* ── Target Job Card ── */}
+      <TargetJobCard onOpenDrawer={() => setJdDrawerOpen(true)} />
+
+      {/* ── JD Upload Drawer ── */}
+      <JDUploadDrawer
+        open={jdDrawerOpen}
+        onClose={() => setJdDrawerOpen(false)}
+        onParsed={handleJDParsed}
+        title={targetJD ? '更新目标岗位' : '设置目标岗位'}
+        subtitle="上传或粘贴职位描述，AI 解析后将影响学习计划的任务过滤"
+      />
 
       {/* ── Page header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 12 }}>
@@ -617,7 +763,7 @@ export default function LearningPathPage() {
           <>
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => { if (adjustStatus !== 'thinking') setPanelOpen(false); }}
+              onClick={() => { if (adjustStatus !== 'thinking') { setPanelOpen(false); setJdPlanResult(null); } }}
               style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 60 }}
             />
             <motion.div
@@ -627,15 +773,21 @@ export default function LearningPathPage() {
             >
               <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Sparkles size={15} color="#6366f1" />
+                  <div style={{ width: 32, height: 32, borderRadius: 10, background: jdPlanResult ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)', border: `1px solid ${jdPlanResult ? 'rgba(16,185,129,0.3)' : 'rgba(99,102,241,0.3)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {jdPlanResult ? <Briefcase size={15} color="#10b981" /> : <Sparkles size={15} color="#6366f1" />}
                   </div>
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>AI 学习路径调整</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>告诉 AI 你已经掌握了什么</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
+                      {jdPlanResult ? `JD 驱动规划：${targetJD?.parsed.title ?? '目标岗位'}` : 'AI 学习路径调整'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+                      {jdPlanResult
+                        ? `与 JD 契合度 ${jdPlanResult.jdAlignment.score}%  ·  ${jdPlanResult.gaps.length} 个技能待补充`
+                        : '告诉 AI 你已经掌握了什么'}
+                    </div>
                   </div>
                 </div>
-                <button onClick={() => { if (adjustStatus !== 'thinking') setPanelOpen(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex' }}>
+                <button onClick={() => { if (adjustStatus !== 'thinking') { setPanelOpen(false); setJdPlanResult(null); } }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', display: 'flex' }}>
                   <X size={18} />
                 </button>
               </div>
@@ -658,29 +810,91 @@ export default function LearningPathPage() {
                   </div>
                 )}
                 {adjustStatus === 'thinking' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 16 }}>
-                    <Loader2 size={28} color="#6366f1" style={{ animation: 'spin 1s linear infinite' }} />
-                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>AI 正在分析你的学习路径…</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 220, gap: 16 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Loader2 size={24} color="#6366f1" style={{ animation: 'spin 1s linear infinite' }} />
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>
+                        {jdPlanResult === null && targetJD ? 'AI 正在根据 JD 重新规划路径…' : 'AI 正在分析你的学习路径…'}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 6 }}>分析技能匹配度 · 标记优先级 · 找出 gap</div>
+                    </div>
                   </div>
                 )}
                 {adjustStatus === 'preview' && previewTasks && (
                   <div>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ color: '#10b981' }}>●</span> 绿色 = 已标记完成 &nbsp;
-                      <span style={{ color: '#f59e0b' }}>●</span> 黄色 = 内容已调整
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {previewTasks.map(t => (
-                        <div key={t.week} style={{ background: t._autoCompleted ? 'rgba(16,185,129,0.08)' : t._modified ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${t._autoCompleted ? 'rgba(16,185,129,0.3)' : t._modified ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '12px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>第 {t.week} 周</span>
-                            {t._autoCompleted && <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.15)', borderRadius: 6, padding: '1px 7px', fontWeight: 700 }}>自动完成</span>}
-                            {t._modified && !t._autoCompleted && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.15)', borderRadius: 6, padding: '1px 7px', fontWeight: 700 }}>已调整</span>}
+                    {/* JD alignment summary */}
+                    {jdPlanResult && (
+                      <div style={{ marginBottom: 18 }}>
+                        {/* Score + summary */}
+                        <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: jdPlanResult.jdAlignment.score >= 70 ? '#10b981' : jdPlanResult.jdAlignment.score >= 50 ? '#f59e0b' : '#ef4444' }}>
+                              {jdPlanResult.jdAlignment.score}%
+                            </div>
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>与 JD 契合度</div>
                           </div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{t.title}</div>
-                          {t._modified && !t._autoCompleted && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{t.learningContent.length} 条学习内容 · {t.practicalTasks.length} 个实践任务</div>}
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>{jdPlanResult.jdAlignment.summary}</div>
                         </div>
-                      ))}
+                        {/* Gaps */}
+                        {jdPlanResult.gaps.length > 0 && (
+                          <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '12px 16px', marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                              ⚠ JD 要求但路径中缺失
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {jdPlanResult.gaps.map((g, i) => (
+                                <span key={i} style={{ fontSize: 11, color: '#fca5a5', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 20, padding: '3px 9px' }}>{g}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Legend */}
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                          <span>⭐ 高相关任务</span>
+                          <span>○ 低优先级（与岗位关联弱）</span>
+                          <span style={{ color: '#f59e0b' }}>● 内容已更新</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {!jdPlanResult && (
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ color: '#10b981' }}>●</span> 绿色 = 已标记完成 &nbsp;
+                        <span style={{ color: '#f59e0b' }}>●</span> 黄色 = 内容已调整
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                      {previewTasks.map(t => {
+                        const raw = t as unknown as Record<string, unknown>;
+                        const isHighPriority = String(t.title).startsWith('⭐');
+                        const isLowPriority = (raw['_lowPriority'] as boolean) === true;
+                        const bgColor = t._autoCompleted ? 'rgba(16,185,129,0.08)'
+                          : isHighPriority ? 'rgba(99,102,241,0.08)'
+                          : isLowPriority ? 'rgba(0,0,0,0.12)'
+                          : t._modified ? 'rgba(245,158,11,0.07)'
+                          : 'rgba(255,255,255,0.03)';
+                        const borderColor = t._autoCompleted ? 'rgba(16,185,129,0.3)'
+                          : isHighPriority ? 'rgba(99,102,241,0.3)'
+                          : isLowPriority ? 'rgba(255,255,255,0.05)'
+                          : t._modified ? 'rgba(245,158,11,0.3)'
+                          : 'rgba(255,255,255,0.07)';
+                        return (
+                          <div key={t.week} style={{ background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 10, padding: '12px 14px', opacity: isLowPriority ? 0.55 : 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>第 {t.week} 周</span>
+                              {isHighPriority && <span style={{ fontSize: 10, color: '#6366f1', background: 'rgba(99,102,241,0.15)', borderRadius: 6, padding: '1px 7px', fontWeight: 700 }}>JD 高相关</span>}
+                              {isLowPriority && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)', borderRadius: 6, padding: '1px 7px' }}>低优先级</span>}
+                              {t._autoCompleted && <span style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.15)', borderRadius: 6, padding: '1px 7px', fontWeight: 700 }}>已完成</span>}
+                              {t._modified && !t._autoCompleted && !isHighPriority && !isLowPriority && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.15)', borderRadius: 6, padding: '1px 7px', fontWeight: 700 }}>已调整</span>}
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: isLowPriority ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{t.title}</div>
+                            {t._modified && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>{t.objective?.slice(0, 80)}{(t.objective?.length ?? 0) > 80 ? '…' : ''}</div>}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -703,7 +917,9 @@ export default function LearningPathPage() {
                 <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                   {adjustStatus === 'preview' ? (
                     <div style={{ display: 'flex', gap: 10 }}>
-                      <button onClick={() => { setAdjustStatus('idle'); setPreviewTasks(null); }} style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer' }}>重新描述</button>
+                      <button onClick={() => { setAdjustStatus('idle'); setPreviewTasks(null); setJdPlanResult(null); }} style={{ flex: 1, padding: '10px 0', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer' }}>
+                      {jdPlanResult ? '重新上传 JD' : '重新描述'}
+                    </button>
                       <button onClick={handleApply} style={{ flex: 2, padding: '10px 0', border: 'none', borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <Check size={14} /> 应用修改
                       </button>

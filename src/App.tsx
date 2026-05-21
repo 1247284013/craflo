@@ -13,6 +13,7 @@ import MockInterview from './pages/MockInterview';
 import SettingsPage from './pages/Settings';
 import CommunityPage from './pages/Community';
 import KnowledgeBasePage from './pages/KnowledgeBase';
+import AgentSystemPage from './pages/AgentSystem';
 
 function RequireOnboarding({ children }: { children: React.ReactNode }) {
   const { onboardingComplete } = useAppStore();
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="/interview" element={<MockInterview />} />
             <Route path="/community" element={<CommunityPage />} />
             <Route path="/knowledge" element={<KnowledgeBasePage />} />
+            <Route path="/agents" element={<AgentSystemPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
 

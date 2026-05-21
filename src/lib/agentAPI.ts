@@ -132,8 +132,88 @@ export async function adjustLearningPath<T>(tasks: T[], userInput: string): Prom
   return adjusted;
 }
 
+// ── 5b. Learning Path: re-plan based on JD ───────────────────────────────────
+
+export interface JDPlanResult<T> {
+  tasks: T[];
+  gaps: string[];
+  jdAlignment: {
+    score: number;
+    summary: string;
+    highlights: string[];
+  };
+}
+
+export async function planWithJD<T>(
+  parsedJD: ParsedJDResponse,
+  tasks: T[],
+  roleType?: string,
+): Promise<JDPlanResult<T>> {
+  return post<JDPlanResult<T>>('/api/learning/plan-with-jd', { parsedJD, tasks, roleType });
+}
+
+// ── 7. Career / JD — parse a JD string into structured data ─────────────────
+
+export interface ParsedJDResponse {
+  title: string;
+  company?: string;
+  roleType?: string;
+  summary?: string;
+  requiredSkills: string[];
+  preferredSkills: string[];
+  keyResponsibilities: string[];
+  keywords: string[];
+}
+
+export async function parseJD(jdText: string): Promise<ParsedJDResponse> {
+  const { parsed } = await post<{ parsed: ParsedJDResponse }>('/api/career/parse-jd', { jdText });
+  return parsed;
+}
+
+// ── 8. Career / JD — analyze skill gap ───────────────────────────────────────
+
+export interface GapAnalysis {
+  gapAnalysis: string[];
+  emphasize: string[];
+  interviewFocus: string[];
+  fitScore: number;
+}
+
+export async function analyzeJDGap(
+  parsedJD: ParsedJDResponse,
+  userSkills: string[],
+  projectSummaries: string[],
+): Promise<GapAnalysis> {
+  return post<GapAnalysis>('/api/career/analyze-gap', { parsedJD, userSkills, projectSummaries });
+}
+
 // ── Health check (optional, for debugging) ───────────────────────────────────
 export async function checkBackendHealth(): Promise<{ status: string; langsmith: string }> {
   const res = await fetch(`${API_BASE}/api/health`);
+  return res.json();
+}
+
+// ── Agent Registry ────────────────────────────────────────────────────────────
+
+export interface AgentMeta {
+  id: string;
+  name: string;
+  group: 'rag' | 'project' | 'portfolio' | 'learning';
+  description: string;
+  inputSchema: Record<string, string>;
+  outputSchema: Record<string, string>;
+  connects_to: string[];
+  tools?: string[];
+}
+
+export interface AgentRegistryResponse {
+  total: number;
+  groups: { rag: number; project: number; portfolio: number; learning: number };
+  agents: AgentMeta[];
+}
+
+export async function fetchAgents(): Promise<AgentRegistryResponse> {
+  const res = await fetch(`${API_BASE}/api/agents`);
+  if (!res.ok) throw new Error(`Failed to fetch agents: ${res.status}`);
   return res.json();
 }

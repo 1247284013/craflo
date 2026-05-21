@@ -14,6 +14,7 @@ import {
   PanelLeftOpen,
   Users,
   Library,
+  Network,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useSettingsStore, ACCENT_COLORS } from '../../store/useSettingsStore';
@@ -29,6 +30,7 @@ const NAV_ICONS = [
   { to: '/interview',    icon: MessageSquare,     key: 'interview' },
   { to: '/community',    icon: Users,             key: 'community' },
   { to: '/knowledge',    icon: Library,           key: 'knowledge' },
+  { to: '/agents',       icon: Network,           key: 'agents'    },
 ] as const;
 
 interface SidebarProps {

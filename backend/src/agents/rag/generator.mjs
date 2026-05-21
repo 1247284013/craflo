@@ -1,0 +1,28 @@
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { BaseAgent } from '../base.mjs';
+import { genLLM } from '../llms.mjs';
+import { getLLMText, parseAnswer } from './helpers.mjs';
+import { getAgentConfig } from '../config.mjs';
+
+const CFG = getAgentConfig('knowledge_generator');
+
+class KnowledgeGeneratorAgent extends BaseAgent {
+  constructor() {
+    super(CFG);
+  }
+
+  async execute(state) {
+    const lang = state.lang === 'en' ? '英文' : '中文';
+    const prompt = CFG.systemPrompt
+      .replace('{lang}', lang)
+      .replace('{context}', state.context ?? '');
+    const res = await genLLM.invoke([
+      new SystemMessage(prompt),
+      new HumanMessage(state.rewrittenQuery || state.query),
+    ]);
+
+    return parseAnswer(getLLMText(res));
+  }
+}
+
+export const knowledgeGeneratorAgent = new KnowledgeGeneratorAgent();

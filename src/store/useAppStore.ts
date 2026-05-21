@@ -10,6 +10,8 @@ import type {
   Portfolio,
   ResumeItem,
   InterviewSession,
+  TargetJD,
+  AppliedJD,
 } from '../types';
 
 interface AppStore extends AppState {
@@ -32,6 +34,8 @@ interface AppStore extends AppState {
   addInterviewSession: (session: InterviewSession) => void;
   updateInterviewSession: (id: string, updates: Partial<InterviewSession>) => void;
   setActiveSession: (id: string | null) => void;
+  setTargetJD: (jd: TargetJD | null) => void;
+  setAppliedJD: (jd: AppliedJD | null) => void;
   reset: () => void;
 }
 
@@ -49,6 +53,8 @@ const initialState: AppState = {
   resumeItems: [],
   interviewSessions: [],
   activeSessionId: null,
+  targetJD: null,
+  appliedJD: null,
 };
 
 export const useAppStore = create<AppStore>()(
@@ -141,6 +147,10 @@ export const useAppStore = create<AppStore>()(
         })),
 
       setActiveSession: (id) => set({ activeSessionId: id }),
+
+      setTargetJD: (jd) => set({ targetJD: jd }),
+
+      setAppliedJD: (jd) => set({ appliedJD: jd }),
 
       reset: () => set(initialState),
     }),

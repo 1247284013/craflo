@@ -233,6 +233,33 @@ export interface InterviewSession {
   reportSummary?: InterviewReport;
 }
 
+// ── JD (Job Description) types ───────────────────────────────────────────────
+
+export interface ParsedJD {
+  title: string;
+  company?: string;
+  requiredSkills: string[];
+  preferredSkills: string[];
+  keyResponsibilities: string[];
+  keywords: string[];
+  roleType?: string;
+  summary?: string;
+}
+
+export interface TargetJD {
+  raw: string;                   // original pasted text or OCR'd text
+  parsed: ParsedJD;
+  source: 'text' | 'image';
+  fileName?: string;
+  savedAt: string;               // ISO timestamp
+}
+
+export interface AppliedJD extends TargetJD {
+  gapAnalysis?: string[];        // skills user is missing
+  emphasize?: string[];          // what to highlight in resume
+  interviewFocus?: string[];     // key topics to prep for
+}
+
 export interface AppState {
   onboardingComplete: boolean;
   onboardingStep: number;
@@ -247,4 +274,6 @@ export interface AppState {
   resumeItems: ResumeItem[];
   interviewSessions: InterviewSession[];
   activeSessionId: string | null;
+  targetJD: TargetJD | null;       // career direction JD (persistent)
+  appliedJD: AppliedJD | null;     // job application JD (session-level)
 }
