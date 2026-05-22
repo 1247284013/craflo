@@ -786,3 +786,100 @@ Shared instances are in `backend/src/agents/llms.mjs`.
 | `genLLM` | 0.5 | 2000 | knowledge_generator, fallback_generator |
 
 To change a model or parameters, edit `backend/src/agents/llms.mjs`.
+
+---
+
+## Agent 6 — `learning_path_orchestrator` · LearningPathOrchestratorAgent
+
+> **File**: `backend/src/agents/learning/pathOrchestrator.mjs`
+> **Group**: `learning`
+> **Role**: 整个职业成长系统的核心调度 Agent。接受用户目标，生成完整学习路径，并主动调用其他 Agent 完成目标匹配、项目规划等子任务。
+
+### Input Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | `'job' \| 'school'` | 求职或申请学校模式 |
+| `profile` | `string` | 用户背景描述（学历、经历） |
+| `currentSkills` | `string[]` | 当前已有技能标签 |
+| `direction` | `string` | 目标方向 / 目标专业 |
+| `jdContext` | `string?` | 上传的 JD 或专业关键词 |
+| `preferences` | `string?` | 偏好（城市/规模/国家等） |
+
+### Output Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `weeklyTasks` | `WeeklyTask[]` | 完整的周学习路径 |
+| `targets` | `Target[]` | 匹配的目标公司或院校 |
+| `tiers` | `{ reach, target, safety }` | 按难度分档的目标列表 |
+| `resumeTips` | `string` | 通用简历调整建议 |
+| `portfolioTips` | `string` | 通用作品集调整建议 |
+| `agentCallLog` | `{ agent, status, output }[]` | 编排过程中调用的 Agent 记录 |
+| `orchestration` | `{ suggestProjects, portfolioFocus }` | 下游 Agent 的上下文提示 |
+
+### Orchestration Flow [edit]
+
+```
+LearningPathOrchestratorAgent
+  ├── Step 1: plannerLLM → generate weeklyTasks + orchestration hints
+  └── Step 2: targetMatcherAgent.execute() → targets / tiers
+       (future) Step 3: projectAgent.initTasks() → project scaffolding
+       (future) Step 4: portfolioAgent.outline() → portfolio structure
+```
+
+### System Prompt [edit]
+
+Generates `weeklyTasks` array + `orchestration` JSON in one LLM call. See `pathOrchestrator.mjs` for full prompt.
+
+### Connects To
+
+`target_matcher` → `project_agent` → `portfolio_agent` → `knowledge_base`
+
+---
+
+## Agent 7 — `target_matcher` · TargetMatcherAgent
+
+> **File**: `backend/src/agents/career/targetMatcher.mjs`
+> **Group**: `career`
+> **Role**: 根据用户背景和目标方向，推荐目标公司（求职）或目标院校（申请），分冲刺/目标/保底三档，并给出简历和作品集微调建议。
+
+### Mode: `job` — 目标公司匹配
+
+| Field | Description |
+|-------|-------------|
+| `name` | 公司名 |
+| `industry` | 行业 |
+| `size` | 规模（大厂/中型/独角兽/初创） |
+| `tier` | `reach \| target \| safety` |
+| `matchScore` | 匹配度 0-100 |
+| `roles` | 适合的岗位方向 |
+| `highlights` | 公司特点一句话 |
+| `resumeTip` | 针对该公司的简历/作品集重点 |
+| `city` | 主要城市 |
+
+### Mode: `school` — 目标院校匹配
+
+| Field | Description |
+|-------|-------------|
+| `name` | 院校名（中英文） |
+| `country` | 国家 |
+| `program` | 具体项目名 |
+| `tier` | `reach \| target \| safety` |
+| `offerChance` | 录取几率 0-100 |
+| `deadline` | 申请截止时间 |
+| `highlights` | 项目特点一句话 |
+| `portfolioTip` | 作品集需要体现的方向 |
+| `tuition` | 学费范围 |
+
+### Tier Definition [edit]
+
+| Tier | 求职 | 申请学校 |
+|------|------|---------|
+| `reach` | 知名大厂、竞争激烈 | 顶尖院校、录取率低 |
+| `target` | 最匹配、最合理的核心目标 | 最合理的核心申请目标 |
+| `safety` | 基本确定能拿面试 | 基本确定能拿 offer |
+
+### Connects To
+
+`learning_path_orchestrator`

@@ -17,6 +17,11 @@ export const plannerLLM = new ChatGoogleGenerativeAI({
   model: MODEL, apiKey: KEY, temperature: 0.3, maxOutputTokens: 2000,
 });
 
+/** Learning path orchestrator — needs large output for full weekly task JSON */
+export const orchestratorLLM = new ChatGoogleGenerativeAI({
+  model: MODEL, apiKey: KEY, temperature: 0.3, maxOutputTokens: 8000,
+});
+
 /** Project agent (content production) */
 export const projectAgentLLM = new ChatGoogleGenerativeAI({
   model: MODEL, apiKey: KEY, temperature: 0.5, maxOutputTokens: 3000,

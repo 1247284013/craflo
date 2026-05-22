@@ -15,22 +15,23 @@ import {
   Users,
   Library,
   Network,
+  Target,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useSettingsStore, ACCENT_COLORS } from '../../store/useSettingsStore';
 import { useT } from '../../hooks/useT';
 
 const NAV_ICONS = [
-  { to: '/dashboard',    icon: LayoutDashboard, key: 'dashboard' },
-  { to: '/profile',      icon: UserCircle,       key: 'profile'   },
-  { to: '/learning-path',icon: BookOpen,          key: 'learningPath' },
-  { to: '/project',      icon: FolderOpen,        key: 'project'   },
-  { to: '/portfolio',    icon: Image,             key: 'portfolio' },
-  { to: '/resume',       icon: FileText,          key: 'resume'    },
-  { to: '/interview',    icon: MessageSquare,     key: 'interview' },
-  { to: '/community',    icon: Users,             key: 'community' },
-  { to: '/knowledge',    icon: Library,           key: 'knowledge' },
-  { to: '/agents',       icon: Network,           key: 'agents'    },
+  { to: '/dashboard',       icon: LayoutDashboard, key: 'dashboard'     },
+  { to: '/profile',         icon: UserCircle,      key: 'profile'       },
+  { to: '/career-targets',  icon: Target,          key: 'careerTargets' },
+  { to: '/project',         icon: FolderOpen,      key: 'project'       },
+  { to: '/portfolio',       icon: Image,           key: 'portfolio'     },
+  { to: '/resume',          icon: FileText,        key: 'resume'        },
+  { to: '/interview',       icon: MessageSquare,   key: 'interview'     },
+  { to: '/community',       icon: Users,           key: 'community'     },
+  { to: '/knowledge',       icon: Library,         key: 'knowledge'     },
+  { to: '/agents',          icon: Network,         key: 'agents'        },
 ] as const;
 
 interface SidebarProps {

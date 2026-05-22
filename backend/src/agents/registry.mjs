@@ -4,22 +4,21 @@
  * Usage:
  *   import { AgentRegistry } from './agents/registry.mjs';
  *
- *   AgentRegistry.all()              → BaseAgent[]
- *   AgentRegistry.get('query_analyzer') → BaseAgent | undefined
- *   AgentRegistry.byGroup('rag')     → BaseAgent[]
- *   AgentRegistry.toJSON()           → serialisable metadata array
+ *   AgentRegistry.all()                    → BaseAgent[]
+ *   AgentRegistry.get('knowledge_base')    → BaseAgent | undefined
+ *   AgentRegistry.byGroup('knowledge')     → BaseAgent[]
+ *   AgentRegistry.toJSON()                 → serialisable metadata array
  *
  * Exposed via GET /api/agents in index.mjs.
+ *
+ * Note: The KnowledgeBaseAgent wraps the internal 7-step RAG pipeline.
+ * Internal RAG sub-agents (query_analyzer, reranker, etc.) are implementation
+ * details and are NOT registered here — they are not part of the public
+ * business-level agent contract.
  */
 
-// ── RAG pipeline agents ───────────────────────────────────────────────────────
-import { queryAnalyzerAgent }      from './rag/queryAnalyzer.mjs';
-import { queryRewriterAgent }      from './rag/queryRewriter.mjs';
-import { hybridRetrieverAgent }    from './rag/hybridRetriever.mjs';
-import { rerankerAgent }           from './rag/reranker.mjs';
-import { docGraderAgent }          from './rag/docGrader.mjs';
-import { knowledgeGeneratorAgent } from './rag/generator.mjs';
-import { fallbackGeneratorAgent }  from './rag/fallbackGenerator.mjs';
+// ── Knowledge Base (wraps full RAG pipeline) ──────────────────────────────────
+import { knowledgeBaseAgent } from './rag/knowledgeBase.mjs';
 
 // ── Project Workshop agents ───────────────────────────────────────────────────
 import { nodeSuggesterAgent }        from './project/nodeSuggester.mjs';
@@ -31,32 +30,34 @@ import { projectAnalyzerAgent }      from './project/projectAnalyzer.mjs';
 import { projectHandoffAgent }     from './portfolio/projectHandoff.mjs';
 import { portfolioStructureAgent } from './portfolio/portfolioStructure.mjs';
 
-// ── Learning Path agent ───────────────────────────────────────────────────────
-import { pathAdjusterAgent } from './learning/pathAdjuster.mjs';
+// ── Learning Path agents ──────────────────────────────────────────────────────
+import { pathAdjusterAgent }              from './learning/pathAdjuster.mjs';
+import { learningPathOrchestratorAgent }  from './learning/pathOrchestrator.mjs';
+
+// ── Career agents ─────────────────────────────────────────────────────────────
+import { targetMatcherAgent } from './career/targetMatcher.mjs';
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 const AGENTS = [
-  // RAG (execution order mirrors the LangGraph pipeline)
-  queryAnalyzerAgent,
-  queryRewriterAgent,
-  hybridRetrieverAgent,
-  rerankerAgent,
-  docGraderAgent,
-  knowledgeGeneratorAgent,
-  fallbackGeneratorAgent,
+  // Knowledge Base (1 agent, full RAG pipeline inside)
+  knowledgeBaseAgent,
 
-  // Project Workshop
+  // Project Workshop (4)
   nodeSuggesterAgent,
   backgroundResearcherAgent,
   fieldCompletionAgent,
   projectAnalyzerAgent,
 
-  // Portfolio A2A
+  // Portfolio A2A (2)
   projectHandoffAgent,
   portfolioStructureAgent,
 
-  // Learning Path
+  // Learning Path (2: orchestrator + adjuster)
+  learningPathOrchestratorAgent,
   pathAdjusterAgent,
+
+  // Career (1)
+  targetMatcherAgent,
 ];
 
 export const AgentRegistry = {

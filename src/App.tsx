@@ -14,6 +14,7 @@ import SettingsPage from './pages/Settings';
 import CommunityPage from './pages/Community';
 import KnowledgeBasePage from './pages/KnowledgeBase';
 import AgentSystemPage from './pages/AgentSystem';
+import CareerTargetsPage from './pages/CareerTargets';
 
 function RequireOnboarding({ children }: { children: React.ReactNode }) {
   const { onboardingComplete } = useAppStore();
@@ -50,7 +51,8 @@ export default function App() {
             <Route path="/profile" element={<ProfileCenter />} />
             <Route path="/role" element={<Navigate to="/profile" replace />} />
             <Route path="/skills" element={<Navigate to="/profile" replace />} />
-            <Route path="/learning-path" element={<LearningPathPage />} />
+            <Route path="/learning-path" element={<Navigate to="/career-targets" replace />} />
+            <Route path="/learning-path-detail" element={<LearningPathPage />} />
             <Route path="/project" element={<ProjectWorkshop />} />
             <Route path="/portfolio" element={<PortfolioStudio />} />
             <Route path="/resume" element={<ResumeOptimizer />} />
@@ -58,6 +60,7 @@ export default function App() {
             <Route path="/community" element={<CommunityPage />} />
             <Route path="/knowledge" element={<KnowledgeBasePage />} />
             <Route path="/agents" element={<AgentSystemPage />} />
+            <Route path="/career-targets" element={<CareerTargetsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
 

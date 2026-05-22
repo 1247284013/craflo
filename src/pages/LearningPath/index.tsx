@@ -508,7 +508,7 @@ function TargetJobCard({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main page
 // ─────────────────────────────────────────────────────────────────────────────
-export default function LearningPathPage() {
+export default function LearningPathPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { learningPath, currentWeek, completeWeekTask, setCurrentWeek, updateWeeklyTasks, targetJD, setTargetJD } = useAppStore();
   const { isMobile } = useBreakpoint();
@@ -631,9 +631,9 @@ export default function LearningPathPage() {
 
   return (
     <div style={{
-      padding: isMobile ? '16px' : '32px',
-      maxWidth: 900,
-      margin: '0 auto',
+      padding: embedded ? '0' : (isMobile ? '16px' : '32px'),
+      maxWidth: embedded ? '100%' : 900,
+      margin: embedded ? '0' : '0 auto',
       position: 'relative',
     }}>
 

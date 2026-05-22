@@ -18,9 +18,11 @@ import { nodeSuggesterAgent }        from './agents/project/nodeSuggester.mjs';
 import { backgroundResearcherAgent } from './agents/project/backgroundResearcher.mjs';
 import { fieldCompletionAgent }      from './agents/project/fieldCompletion.mjs';
 import { projectAnalyzerAgent }      from './agents/project/projectAnalyzer.mjs';
-import { pathAdjusterAgent }         from './agents/learning/pathAdjuster.mjs';
-import { genLLM, careerLLM }          from './agents/llms.mjs';
-import { getLLMText as parseLLMContent } from './agents/rag/helpers.mjs';
+import { pathAdjusterAgent }                from './agents/learning/pathAdjuster.mjs';
+import { learningPathOrchestratorAgent }    from './agents/learning/pathOrchestrator.mjs';
+import { targetMatcherAgent }              from './agents/career/targetMatcher.mjs';
+import { genLLM, careerLLM }              from './agents/llms.mjs';
+import { getLLMText as parseLLMContent }   from './agents/rag/helpers.mjs';
 
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
@@ -378,12 +380,49 @@ app.post('/api/career/analyze-gap', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEARNING PATH ORCHESTRATOR
+// POST /api/learning/orchestrate
+// Body: { mode, profile, currentSkills, direction, jdContext?, preferences? }
+// Orchestrates: plannerLLM → TargetMatcherAgent
+// Returns: { weeklyTasks, targets, tiers, resumeTips, portfolioTips, agentCallLog }
+// ═══════════════════════════════════════════════════════════════════════════════
+app.post('/api/learning/orchestrate', async (req, res) => {
+  const { mode = 'job', profile = '', currentSkills = [], direction = '', jdContext = '', preferences = '' } = req.body;
+  if (!direction.trim()) return res.status(400).json({ error: 'direction is required' });
+  try {
+    const result = await learningPathOrchestratorAgent.execute({ mode, profile, currentSkills, direction, jdContext, preferences });
+    res.json(result);
+  } catch (err) {
+    console.error('[/api/learning/orchestrate]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TARGET MATCHER (standalone)
+// POST /api/career/match-targets
+// Body: { mode, profile, skills, direction, preferences? }
+// Returns: { targets, tiers, resumeTips, portfolioTips }
+// ═══════════════════════════════════════════════════════════════════════════════
+app.post('/api/career/match-targets', async (req, res) => {
+  const { mode = 'job', profile = '', skills = [], direction = '', preferences = '' } = req.body;
+  if (!direction.trim()) return res.status(400).json({ error: 'direction is required' });
+  try {
+    const result = await targetMatcherAgent.execute({ mode, profile, skills, direction, preferences });
+    res.json(result);
+  } catch (err) {
+    console.error('[/api/career/match-targets]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 app.listen(PORT, () => {
   const tracing = process.env.LANGCHAIN_TRACING_V2 === 'true';
   console.log(`\n🚀  Craflo Agent Backend  →  http://localhost:${PORT}`);
-  console.log(`🤖  Agents registered: ${AgentRegistry.all().length} (RAG:${AgentRegistry.byGroup('rag').length} Project:${AgentRegistry.byGroup('project').length} Portfolio:${AgentRegistry.byGroup('portfolio').length} Learning:${AgentRegistry.byGroup('learning').length})`);
+  console.log(`🤖  Agents registered: ${AgentRegistry.all().length} (KB:${AgentRegistry.byGroup('knowledge').length} Project:${AgentRegistry.byGroup('project').length} Portfolio:${AgentRegistry.byGroup('portfolio').length} Learning:${AgentRegistry.byGroup('learning').length} Career:${AgentRegistry.byGroup('career').length})`);
   console.log(
     tracing
       ? `📊  LangSmith tracing ON  →  project: "${process.env.LANGCHAIN_PROJECT}"`

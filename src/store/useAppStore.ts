@@ -12,6 +12,9 @@ import type {
   InterviewSession,
   TargetJD,
   AppliedJD,
+  CareerTargetState,
+  CareerDirection,
+  ApplicationRecord,
 } from '../types';
 
 interface AppStore extends AppState {
@@ -36,6 +39,15 @@ interface AppStore extends AppState {
   setActiveSession: (id: string | null) => void;
   setTargetJD: (jd: TargetJD | null) => void;
   setAppliedJD: (jd: AppliedJD | null) => void;
+  setCareerTargets: (state: CareerTargetState | null) => void;
+  addCareerDirection: (dir: CareerDirection) => void;
+  updateCareerDirection: (id: string, updates: Partial<CareerDirection>) => void;
+  deleteCareerDirection: (id: string) => void;
+  reorderCareerDirections: (ids: string[]) => void;
+  setActiveCareerDirection: (id: string) => void;
+  addApplication: (record: ApplicationRecord) => void;
+  updateApplication: (id: string, updates: Partial<ApplicationRecord>) => void;
+  deleteApplication: (id: string) => void;
   reset: () => void;
 }
 
@@ -55,6 +67,8 @@ const initialState: AppState = {
   activeSessionId: null,
   targetJD: null,
   appliedJD: null,
+  careerTargets: null,
+  applications: [],
 };
 
 export const useAppStore = create<AppStore>()(
@@ -151,6 +165,62 @@ export const useAppStore = create<AppStore>()(
       setTargetJD: (jd) => set({ targetJD: jd }),
 
       setAppliedJD: (jd) => set({ appliedJD: jd }),
+
+      setCareerTargets: (state) => set({ careerTargets: state }),
+
+      addCareerDirection: (dir) =>
+        set((s) => ({
+          careerTargets: s.careerTargets
+            ? { ...s.careerTargets, directions: [...(s.careerTargets.directions ?? []), dir] }
+            : { mode: dir.mode, direction: dir.label, directions: [dir], targets: [], tiers: { reach: [], target: [], safety: [] }, resumeTips: '', portfolioTips: '', generatedAt: new Date().toISOString() },
+        })),
+
+      updateCareerDirection: (id, updates) =>
+        set((s) => ({
+          careerTargets: s.careerTargets ? {
+            ...s.careerTargets,
+            directions: (s.careerTargets.directions ?? []).map(d => d.id === id ? { ...d, ...updates } : d),
+          } : s.careerTargets,
+        })),
+
+      deleteCareerDirection: (id) =>
+        set((s) => ({
+          careerTargets: s.careerTargets ? {
+            ...s.careerTargets,
+            directions: (s.careerTargets.directions ?? []).filter(d => d.id !== id),
+          } : s.careerTargets,
+        })),
+
+      reorderCareerDirections: (ids) =>
+        set((s) => {
+          if (!s.careerTargets) return s;
+          const map = new Map((s.careerTargets.directions ?? []).map(d => [d.id, d]));
+          const reordered = ids.map((id, i) => ({ ...map.get(id)!, order: i })).filter(Boolean);
+          return { careerTargets: { ...s.careerTargets, directions: reordered } };
+        }),
+
+      setActiveCareerDirection: (id) =>
+        set((s) => ({
+          careerTargets: s.careerTargets ? {
+            ...s.careerTargets,
+            directions: (s.careerTargets.directions ?? []).map(d => ({ ...d, isActive: d.id === id })),
+          } : s.careerTargets,
+        })),
+
+      addApplication: (record) =>
+        set((s) => ({ applications: [...s.applications, record] })),
+
+      updateApplication: (id, updates) =>
+        set((s) => ({
+          applications: s.applications.map((a) =>
+            a.id === id ? { ...a, ...updates } : a
+          ),
+        })),
+
+      deleteApplication: (id) =>
+        set((s) => ({
+          applications: s.applications.filter((a) => a.id !== id),
+        })),
 
       reset: () => set(initialState),
     }),

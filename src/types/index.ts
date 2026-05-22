@@ -260,6 +260,83 @@ export interface AppliedJD extends TargetJD {
   interviewFocus?: string[];     // key topics to prep for
 }
 
+// ── Career Target types ──────────────────────────────────────────────────────
+
+export type CareerMode = 'job' | 'school';
+export type TargetTier = 'reach' | 'target' | 'safety';
+
+export interface TargetItem {
+  name: string;
+  tier: TargetTier;
+  matchScore?: number;     // job mode: 0-100
+  offerChance?: number;    // school mode: 0-100
+  industry?: string;
+  country?: string;
+  program?: string;
+  size?: string;
+  roles?: string[];
+  highlights: string;
+  resumeTip?: string;
+  portfolioTip?: string;
+  city?: string;
+  deadline?: string;
+  tuition?: string;
+}
+
+export interface TargetTiers {
+  reach:  TargetItem[];
+  target: TargetItem[];
+  safety: TargetItem[];
+}
+
+export interface CareerDirection {
+  id: string;
+  label: string;         // e.g. "AI 产品经理" or "RCA 交互设计 MFA"
+  mode: CareerMode;
+  order: number;
+  isActive: boolean;     // currently selected for AI planning
+  targets?: TargetItem[];
+  tiers?: TargetTiers;
+  resumeTips?: string;
+  portfolioTips?: string;
+  generatedAt?: string;
+}
+
+export interface CareerTargetState {
+  mode: CareerMode;
+  direction: string;
+  directions: CareerDirection[];   // multi-direction list
+  targets: TargetItem[];
+  tiers: TargetTiers;
+  resumeTips: string;
+  portfolioTips: string;
+  generatedAt: string;
+}
+
+// ── Application Tracker types ────────────────────────────────────────────────
+
+export type ApplicationStage =
+  | 'preparing'   // 准备中
+  | 'submitted'   // 已投递
+  | 'assessment'  // 笔试/作品集提交
+  | 'interview'   // 面试
+  | 'offer'       // 拿到 offer
+  | 'rejected';   // 已拒绝
+
+export interface ApplicationRecord {
+  id: string;
+  mode: CareerMode;
+  name: string;          // company or school name
+  role?: string;         // job title or program name
+  tier: TargetTier;
+  stage: ApplicationStage;
+  submittedAt?: string;
+  notes?: string;
+  resumeVersion?: string;
+  portfolioVersion?: string;
+  updatedAt: string;
+}
+
 export interface AppState {
   onboardingComplete: boolean;
   onboardingStep: number;
@@ -274,6 +351,8 @@ export interface AppState {
   resumeItems: ResumeItem[];
   interviewSessions: InterviewSession[];
   activeSessionId: string | null;
-  targetJD: TargetJD | null;       // career direction JD (persistent)
-  appliedJD: AppliedJD | null;     // job application JD (session-level)
+  targetJD: TargetJD | null;
+  appliedJD: AppliedJD | null;
+  careerTargets: CareerTargetState | null;
+  applications: ApplicationRecord[];
 }

@@ -193,12 +193,84 @@ export async function checkBackendHealth(): Promise<{ status: string; langsmith:
   return res.json();
 }
 
+// ── 8. Learning Path Orchestrator ─────────────────────────────────────────────
+
+export interface TargetItem {
+  name: string;
+  tier: 'reach' | 'target' | 'safety';
+  matchScore?: number;   // job mode
+  offerChance?: number;  // school mode
+  industry?: string;
+  country?: string;
+  program?: string;
+  size?: string;
+  roles?: string[];
+  highlights: string;
+  resumeTip?: string;
+  portfolioTip?: string;
+  city?: string;
+  deadline?: string;
+  tuition?: string;
+}
+
+export interface TargetTiers {
+  reach:  TargetItem[];
+  target: TargetItem[];
+  safety: TargetItem[];
+}
+
+export interface OrchestrateResult<T> {
+  weeklyTasks:   T[];
+  targets:       TargetItem[];
+  tiers:         TargetTiers;
+  resumeTips:    string;
+  portfolioTips: string;
+  agentCallLog:  { agent: string; status: string; output?: string; error?: string }[];
+  orchestration: { suggestProjects: string[]; portfolioFocus: string };
+}
+
+export interface OrchestrateInput {
+  mode:          'job' | 'school';
+  profile:       string;
+  currentSkills: string[];
+  direction:     string;
+  jdContext?:    string;
+  preferences?:  string;
+}
+
+export async function orchestrateLearningPath<T>(
+  input: OrchestrateInput,
+): Promise<OrchestrateResult<T>> {
+  return post<OrchestrateResult<T>>('/api/learning/orchestrate', input);
+}
+
+// ── 9. Target Matcher (standalone) ───────────────────────────────────────────
+
+export interface MatchTargetsInput {
+  mode:         'job' | 'school';
+  profile:      string;
+  skills:       string[];
+  direction:    string;
+  preferences?: string;
+}
+
+export interface MatchTargetsResult {
+  targets:       TargetItem[];
+  tiers:         TargetTiers;
+  resumeTips:    string;
+  portfolioTips: string;
+}
+
+export async function matchTargets(input: MatchTargetsInput): Promise<MatchTargetsResult> {
+  return post<MatchTargetsResult>('/api/career/match-targets', input);
+}
+
 // ── Agent Registry ────────────────────────────────────────────────────────────
 
 export interface AgentMeta {
   id: string;
   name: string;
-  group: 'rag' | 'project' | 'portfolio' | 'learning';
+  group: 'knowledge' | 'rag' | 'project' | 'portfolio' | 'learning' | 'career';
   description: string;
   inputSchema: Record<string, string>;
   outputSchema: Record<string, string>;
@@ -208,7 +280,7 @@ export interface AgentMeta {
 
 export interface AgentRegistryResponse {
   total: number;
-  groups: { rag: number; project: number; portfolio: number; learning: number };
+  groups: { rag: number; knowledge: number; project: number; portfolio: number; learning: number; career: number };
   agents: AgentMeta[];
 }
 
